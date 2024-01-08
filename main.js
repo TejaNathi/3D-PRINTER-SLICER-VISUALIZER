@@ -282,29 +282,30 @@ const mergedPositions = [];
        console.log("Combined Face Normal:", normalSum);
     }}
 let normalSum=null;
+let isMouseDownEventAttached = false;
+
+document.getElementById('layflat').addEventListener('click', function () {
+//   let rotionofcube=calculateRotationMatrix(normalSum,constantPlaneNormal);
+//   let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
+//   console.log("mesh matrix",transformationMatrixss);
 
 
-document.getElementById('executeButton').addEventListener('click', function () {
-  let rotionofcube=calculateRotationMatrix(normalSum,constantPlaneNormal);
-  let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-  console.log("mesh matrix",transformationMatrixss);
 
-
-
-  // Multiply the mesh matrix with the rotation matrix
-  const combinedMatrix = new THREE.Matrix4().multiplyMatrices(transformationMatrixss,rotionofcube);
-  // Apply the new rotation to the existing matrix
+//   // Multiply the mesh matrix with the rotation matrix
+//   const combinedMatrix = new THREE.Matrix4().multiplyMatrices(transformationMatrixss,rotionofcube);
+//   // Apply the new rotation to the existing matrix
   
 
 
-  // Apply the combined transformation to the mesh
- meshes.applyMatrix4(combinedMatrix);
-  geometry.verticesNeedUpdate = true; // Update vertices if necessary
-  geometry.normalsNeedUpdate = true;
-  geometry.positionNeedUpdate = true;
-  console.log(meshes.position);
+//   // Apply the combined transformation to the mesh
+//  meshes.applyMatrix4(combinedMatrix);
+//   geometry.verticesNeedUpdate = true; // Update vertices if necessary
+//   geometry.normalsNeedUpdate = true;
+//   geometry.positionNeedUpdate = true;
+//   console.log(meshes.position);
+document.addEventListener('mousedown', onMouseClicksss, false);
 
-
+isMouseDownEventAttached = true;
   // CreateAxesLines should be called outside the click event for efficiency
  // createAxesLines(meshes);
 
@@ -402,7 +403,7 @@ function containsNaN(array) {
 }
 
 let transformationMatrixss =null;
-document.addEventListener('mousedown', onMouseClicksss, false);
+
 
 
 
