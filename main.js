@@ -93,7 +93,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 // Load STL model
-loader.load('blednder.stl', function (geometry) {
+loader.load('voron 2.stl', function (geometry) {
     const material = new THREE.MeshNormalMaterial();
     const meshes = new THREE.Mesh(geometry, material);
     meshes.position.set(0, 0, 0);
@@ -446,6 +446,19 @@ function onMouseClicksss(event) {
        geometry.normalsNeedUpdate = true;
         //meshes.positionNeedUpdate = true;
         transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
+
+        let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes);
+        const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,transformation);
+
+        geometry.applyMatrix4(combinedMatrixs);
+        meshes.updateMatrixWorld();
+         // geometry.verticesNeedUpdate = true; // Update vertices if necessary
+         geometry.normalsNeedUpdate = true;
+          //meshes.positionNeedUpdate = true;
+          transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
+
+
+
         console.log(meshes.position);
         createAxesLines(geometry)
 
@@ -453,45 +466,7 @@ function onMouseClicksss(event) {
     }
 }
 
-// function calculateRotationMatrix(selectedFaceNormal, constantPlaneNormal) {
-//     let axis = new THREE.Vector3().crossVectors(selectedFaceNormal, constantPlaneNormal).normalize();
-
-//     // Ensure axis is positive
-//     if (axis.x < 0 || axis.y < 0 || axis.z < 0) {
-//         axis.negate();
-//     }
-
-//     let angle = Math.acos(selectedFaceNormal.dot(constantPlaneNormal) / (selectedFaceNormal.length() * constantPlaneNormal.length()));
-
-//     // Construct the rotation matrix manually
-//     const rotationMatrix = new THREE.Matrix4();
-//     const c = Math.cos(angle);
-//     const s = Math.sin(angle);
-//     const t = 1 - c;
-
-//     const x = axis.x;
-//     const y = axis.y;
-//     const z = axis.z;
-
-//     rotationMatrix.set(
-//         t * x * x + c, t * x * y - s * z, t * x * z + s * y, 0,
-//         t * x * y + s * z, t * y * y + c, t * y * z - s * x, 0,
-//         t * x * z - s * y, t * y * z + s * x, t * z * z + c, 0,
-//         0, 0, 0, 1
-//     );
-
-//     return rotationMatrix;
-// }
-
-
-// Assuming mesh is your THREE.Mesh object
-
-// Extract the columns of the mesh matrix (local coordinate axes)
 let xAxisLine, yAxisLine, zAxisLine;
-
-// ... (other initialization code)
-
-// Function to create lines along local coordinate axes
 function createAxesLines(mesh) {
     // Extract the columns of the mesh matrix (local coordinate axes)
     const xAxis = new THREE.Vector3().fromArray(mesh.matrix.elements.slice(0, 3));
@@ -528,44 +503,66 @@ function getFaceCenter(geometry, faceIndex) {
     return center;
 }
 
-function calculateTransformationMatrix(faceNormal, center, planeNormal, mesh) {
-    // 1. Calculate the rotation matrix based on the normal
-    const rotationMatrix = calculateRotationMatrix(faceNormal,  planeNormal);
-    console.log("rotaionss", rotationMatrix);
+function calculateTransformationMatrixs(faceIndex, planeMesh, mesh) {
+    // Ensure geometry is updated
+    mesh.geometry.computeBoundingBox();
 
-    // 2. Calculate the translation matrix based on the center
-    const translationMatrix = new THREE.Matrix4();
+    // Update matrix world to ensure accurate transformations
+    mesh.updateMatrixWorld();
 
+    // Calculate the position of the selected face
+    const facePosition = getFacePositions(mesh.geometry, faceIndex,mesh);
 
-    const boundingBox = new THREE.Box3().setFromObject(mesh);
-    const size = new THREE.Vector3();
-    boundingBox.getSize(size);
-    
-    console.log("siezw", size);
-    const offset = size.y / 2;
-    //const centersss=getFaceCenter(planes,  0);
-   const adjustedCenter = center.clone().add(new THREE.Vector3(0, offset, 0));
-    console.log("sie",adjustedCenter);
-   // const translationMatrix = new THREE.Matrix4();
-    translationMatrix.makeTranslation(adjustedCenter.x, adjustedCenter.y, adjustedCenter.z);
-    console.log("translation",translationMatrix);
-    
+    // Get the normal and position of the plane
+    const planeNormal = planeMesh.geometry.faces[0].normal.clone().applyQuaternion(planeMesh.quaternion);
+    const planePosition = planeMesh.position;
 
-    // 3. Combine the rotation and translation matrices
-    const transformationMatrix = new THREE.Matrix4();
-    transformationMatrix.multiplyMatrices(rotationMatrix, translationMatrix);
-    console.log("transformation",transformationMatrix);
+    // Calculate the vector from the face position to a point on the plane
+    const vectorToPlane = new THREE.Vector3().subVectors(facePosition, planePosition);
 
-    // 4. (Optional) If your plane is not aligned with the world axis, adjust the rotation further
-    if (planeNormal) {
-        const alignMatrix = new THREE.Matrix4();
-        const axis = new THREE.Vector3().crossVectors(faceNormal, planeNormal).normalize();
-        const angle = Math.acos(faceNormal.dot(planeNormal) / (faceNormal.length() * planeNormal.length()));
-        alignMatrix.makeRotationAxis(axis, angle);
-        transformationMatrix.premultiply(alignMatrix);
+    // Project the vector onto the plane's normal to find the distance to the plane
+    const distanceToPlane = vectorToPlane.dot(planeNormal);
+
+    // Get the vertices of the selected face
+    const faceVertices = getFaceVertices(mesh.geometry, faceIndex);
+
+    // Calculate the center of the face
+    const faceCenter = new THREE.Vector3();
+    faceVertices.forEach((vertex) => faceCenter.add(vertex));
+    faceCenter.divideScalar(faceVertices.length);
+
+    // Create a translation matrix to move the object's origin to the face center and then move up to the top of the plane
+    const translationMatrix = new THREE.Matrix4().makeTranslation(
+        -faceCenter.x,
+        -faceCenter.y + distanceToPlane,
+        -faceCenter.z
+    );
+
+    return translationMatrix;
+}
+function getFacePositions(geometry, faceIndex, mesh) {
+    const positions = geometry.attributes.position.array;
+    const startIndex = faceIndex * 3 * 3;
+
+    // Calculate the average position of the vertices to get the face position in local coordinates
+    const localPosition = new THREE.Vector3();
+    for (let i = 0; i < 3; i++) {
+        const index = startIndex + i * 3;
+        const x = positions[index];
+        const y = positions[index + 1];
+        const z = positions[index + 2];
+
+        localPosition.add(new THREE.Vector3(x, y, z));
     }
+    localPosition.divideScalar(3);
+    console.log("local",localPosition);
+    
 
-    return transformationMatrix;
+    // Convert the local face position to global coordinates by applying the mesh's matrixWorld
+    const globalPosition = localPosition.clone().applyMatrix4(mesh.matrixWorld);
+    console.log("meshworld",mesh.matrixWorld);
+
+    return globalPosition;
 }
 
 

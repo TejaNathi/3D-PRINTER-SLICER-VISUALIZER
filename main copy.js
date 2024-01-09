@@ -97,11 +97,12 @@ loader.load('Voron_Design_Cube_v7.stl', function (geometry) {
     meshes.position.set(0, 0, 0);
     scene.add(meshes);});
 // Load STL model
-loader.load('Voron_Design_Cube_v7.stl', function (geometry) {
+loader.load('Voron_Design_Cube_v7.stl', 
+function (geometry) {
     const material = new THREE.MeshNormalMaterial();
     const meshes = new THREE.Mesh(geometry, material);
     meshes.position.set(0, 0, 0);
-    scene.add(meshes);
+    scene.add(meshes);});
 
     // Handle mouse click to select face
     window.addEventListener('click', onMouseClick, false);
@@ -288,31 +289,31 @@ const mergedPositions = [];
 let normalSum=null;
 
 
-document.getElementById('executeButton').addEventListener('click', function () {
-  let rotionofcube=calculateRotationMatrix(normalSum,constantPlaneNormal);
-  let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-  console.log("mesh matrix",transformationMatrixss);
+// document.getElementById('executeButton').addEventListener('click', function () {
+// //   let rotionofcube=calculateRotationMatrix(normalSum,constantPlaneNormal);
+// //   let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
+// //   console.log("mesh matrix",transformationMatrixss);
 
 
 
-  // Multiply the mesh matrix with the rotation matrix
-  const combinedMatrix = new THREE.Matrix4().multiplyMatrices(transformationMatrixss,rotionofcube);
-  // Apply the new rotation to the existing matrix
+// //   // Multiply the mesh matrix with the rotation matrix
+// //   const combinedMatrix = new THREE.Matrix4().multiplyMatrices(transformationMatrixss,rotionofcube);
+// //   // Apply the new rotation to the existing matrix
   
 
 
-  // Apply the combined transformation to the mesh
- meshes.applyMatrix4(combinedMatrix);
-  geometry.verticesNeedUpdate = true; // Update vertices if necessary
-  geometry.normalsNeedUpdate = true;
-  geometry.positionNeedUpdate = true;
-  console.log(meshes.position);
+// //   // Apply the combined transformation to the mesh
+// //  meshes.applyMatrix4(combinedMatrix);
+// //   geometry.verticesNeedUpdate = true; // Update vertices if necessary
+// //   geometry.normalsNeedUpdate = true;
+// //   geometry.positionNeedUpdate = true;
+// //   console.log(meshes.position);
 
 
-  // CreateAxesLines should be called outside the click event for efficiency
- // createAxesLines(meshes);
+//   // CreateAxesLines should be called outside the click event for efficiency
+//  // createAxesLines(meshes);
 
-});
+// });
 // const neigbourfacesss = findAllNeighboringFaces(geometry, 58);
 //    console.log("negia",neigbourfacesss);
 
@@ -451,7 +452,7 @@ function onMouseClicksss(event) {
     
 
         // CreateAxesLines should be called outside the click event for efficiency
-        createAxesLines(meshes);
+      //  createAxesLines(meshes);
     }
 }
 
@@ -790,10 +791,7 @@ function getFacePosition(geometry, faceIndex) {
     return position;
 }
 
-// Example usage
-const faceIndex = 1071; // Replace with your desired face index
-const facePosition = getFacePosition(geometry, faceIndex);
-console.log("Face Position:", facePosition);
+
 
 
 
@@ -851,6 +849,3 @@ function areNormalsSimilar(normal1, normal2, threshold) {
     }
 
     animate();
-}, undefined, function (error) {
-    console.error('Error loading STL file:', error);
-});
