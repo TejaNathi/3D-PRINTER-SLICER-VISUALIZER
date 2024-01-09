@@ -93,7 +93,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 // Load STL model
-loader.load('voron 2.stl', function (geometry) {
+loader.load('website bearing.stl', function (geometry) {
     const material = new THREE.MeshNormalMaterial();
     const meshes = new THREE.Mesh(geometry, material);
     meshes.position.set(0, 0, 0);
@@ -427,6 +427,8 @@ function onMouseClicksss(event) {
         console.log("rotaito",rotationMatrix);
         // Clear previous rotation by resetting the matrix
        // let previousRotationMatrix = new THREE.Matrix4();
+       const beforroation=  getFacePositions(geometry, selectedFaceIndex, meshes);
+       console.log("beforerotationface",beforroation);
         
         let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
         console.log("mesh matrix",transformationMatrixss);
@@ -442,25 +444,30 @@ function onMouseClicksss(event) {
         // Apply the combined transformation to the mesh
        geometry.applyMatrix4(combinedMatrix);
       meshes.updateMatrixWorld();
+
+      const afeterrotation=  getFacePositions(geometry, selectedFaceIndex, meshes);
+      console.log("afterrotation",afeterrotation);
        // geometry.verticesNeedUpdate = true; // Update vertices if necessary
        geometry.normalsNeedUpdate = true;
         //meshes.positionNeedUpdate = true;
         transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
 
-        let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes);
-        const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,transformation);
+        let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes,afeterrotation);
+       // const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,transformation);
 
-        geometry.applyMatrix4(combinedMatrixs);
+        geometry.applyMatrix4(transformation);
         meshes.updateMatrixWorld();
          // geometry.verticesNeedUpdate = true; // Update vertices if necessary
          geometry.normalsNeedUpdate = true;
           //meshes.positionNeedUpdate = true;
           transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
+        const afterfacepostioon=  getFacePositions(geometry, selectedFaceIndex, meshes);
+        console.log("afterfacepostion",afterfacepostioon);
 
 
 
         console.log(meshes.position);
-        createAxesLines(geometry)
+       // createAxesLines(geometry)
 
    
     }
@@ -503,7 +510,7 @@ function getFaceCenter(geometry, faceIndex) {
     return center;
 }
 
-function calculateTransformationMatrixs(faceIndex, planeMesh, mesh) {
+function calculateTransformationMatrixs(faceIndex, planeMesh, mesh,facePosition) {
     // Ensure geometry is updated
     mesh.geometry.computeBoundingBox();
 
@@ -511,7 +518,7 @@ function calculateTransformationMatrixs(faceIndex, planeMesh, mesh) {
     mesh.updateMatrixWorld();
 
     // Calculate the position of the selected face
-    const facePosition = getFacePositions(mesh.geometry, faceIndex,mesh);
+    //const facePosition = getFacePositions(mesh.geometry, faceIndex,mesh);
 
     // Get the normal and position of the plane
     const planeNormal = planeMesh.geometry.faces[0].normal.clone().applyQuaternion(planeMesh.quaternion);
@@ -521,7 +528,8 @@ function calculateTransformationMatrixs(faceIndex, planeMesh, mesh) {
     const vectorToPlane = new THREE.Vector3().subVectors(facePosition, planePosition);
 
     // Project the vector onto the plane's normal to find the distance to the plane
-    const distanceToPlane = vectorToPlane.dot(planeNormal);
+    const distanceToPlane = (vectorToPlane.dot(planeNormal))*2;
+    console.log("distanceto the plane",distanceToPlane);
 
     // Get the vertices of the selected face
     const faceVertices = getFaceVertices(mesh.geometry, faceIndex);
@@ -534,7 +542,7 @@ function calculateTransformationMatrixs(faceIndex, planeMesh, mesh) {
     // Create a translation matrix to move the object's origin to the face center and then move up to the top of the plane
     const translationMatrix = new THREE.Matrix4().makeTranslation(
         -faceCenter.x,
-        -faceCenter.y + distanceToPlane,
+        faceCenter.y + distanceToPlane,
         -faceCenter.z
     );
 
@@ -555,12 +563,12 @@ function getFacePositions(geometry, faceIndex, mesh) {
         localPosition.add(new THREE.Vector3(x, y, z));
     }
     localPosition.divideScalar(3);
-    console.log("local",localPosition);
+    //console.log("local",localPosition);
     
 
     // Convert the local face position to global coordinates by applying the mesh's matrixWorld
     const globalPosition = localPosition.clone().applyMatrix4(mesh.matrixWorld);
-    console.log("meshworld",mesh.matrixWorld);
+ //   console.log("meshworld",mesh.matrixWorld);
 
     return globalPosition;
 }
