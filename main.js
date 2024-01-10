@@ -8,13 +8,6 @@ import * as Oribtcontrols from"https://cdn.jsdelivr.net/npm/three@0.114/examples
 import Stats from 'https://cdn.jsdelivr.net/npm/three@0.120.1/examples/jsm/libs/stats.module.min.js';
 import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.120.1/examples/jsm/loaders/STLLoader.js';
 //import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-
-
-
-
-
-
-
 const loader = new STLLoader();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight);
@@ -34,16 +27,8 @@ const faceIndex = 0; // You can change this index based on your requirements
 const faceNormal = new THREE.Vector3();
 planeGeometry.faces[faceIndex].normal.clone(faceNormal);
 
-
-
-
-
-
-
 var controls = new THREE.OrbitControls( camera, renderer.domElement );
 controls.enableDamping = true;
-
-
 
 window.addEventListener('resize', (event) => {
     camera.aspect = innerWidth / innerHeight;
@@ -126,23 +111,6 @@ console.log("angles",angless);
         return vertices2.every(vertex => Math.abs(plane.distanceToPoint(vertex)) < threshold);
     }
     
-
-// Function to check if all vertices are close to the plane formed by the selected face
-// function areVerticesCloseToPlane(selectedVertices, vertices, selectedNormal, threshold) {
-//     const plane = new THREE.Plane().setFromCoplanarPoints(selectedVertices[0], selectedVertices[1], selectedVertices[2]);
-
-//     for (let i = 0; i < vertices.length; i++) {
-//         const distance = plane.distanceToPoint(vertices[i]);
-//         if (distance > threshold) {
-//             return false;
-//         }
-//     }
-
-//     return true;
-// }
-
-
-
     
     // Function to get the vertices of a face
     function getFaceVertices(geometry, faceIndex) {
@@ -342,14 +310,9 @@ function mergeMeshesIntoSingleMesh(meshes) {
     // Create a mesh with the merged geometry and material
     const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial);
     return mergedMesh;
-}
+}   
 
-
-
-
-
-    
-    function getFaceNormal(geometry, faceIndex) {
+function getFaceNormal(geometry, faceIndex) {
         const normals = geometry.attributes.normal.array;
         const startIndex = faceIndex * 9;
        
@@ -401,9 +364,6 @@ function mergeMeshesIntoSingleMesh(meshes) {
 
 let transformationMatrixss =null;
 
-
-
-
 function onMouseClicksss(event) {
     event.preventDefault();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -427,10 +387,7 @@ function onMouseClicksss(event) {
       //  let boxmatrixss=planes.matrix.identity();
        // console.log("boxesmatrixss",boxmatrixss);
         let rotationMatrix = calculateRotationMatrix(selectedFaceNormals, constantPlaneNormal);
-       // console.log("rotaito",rotationMatrix);
-        // Clear previous rotation by resetting the matrix
-       // let previousRotationMatrix = new THREE.Matrix4();
-      // let rotationMatrixs = calculateRotationMatrix(selectedFaceNormals, constantPlaneNormal);
+       
        
         let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
        // console.log("mesh matrix",transformationMatrixss);
@@ -439,50 +396,21 @@ function onMouseClicksss(event) {
 
     
         // Multiply the mesh matrix with the rotation matrix
-        const combinedMatrix = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,rotationMatrix);
+     const combinedMatrix = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,rotationMatrix);
         // Apply the new rotation to the existing matrix
-        const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( singlemeshmatrix,rotationMatrix);
-      
-        
+    const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( singlemeshmatrix,rotationMatrix);
+    geometry.applyMatrix4(combinedMatrix);
+     meshes.updateMatrixWorld();
+    const afeterrotation=  getFacePositions(geometry, selectedFaceIndex, meshes);
+    geometry.normalsNeedUpdate = true;
+    transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
+    singlemeshmatrix = new THREE.Matrix4().copy(singlemeshes.matrix);
 
-
-        // Apply the combined transformation to the mesh
-       geometry.applyMatrix4(combinedMatrix);
-      // singlemeshes.applyMatrix4(combinedMatrixs);
-       
-      meshes.updateMatrixWorld();
-
-      
-      singlemeshes.updateMatrixWorld();
-      singlemeshes.normalNeedupdate=true;
-      
-
-      const afeterrotation=  getFacePositions(geometry, selectedFaceIndex, meshes);
-     // console.log("afterrotation",afeterrotation);
-       // geometry.verticesNeedUpdate = true; // Update vertices if necessary
-       geometry.normalsNeedUpdate = true;
-        //meshes.positionNeedUpdate = true;
-        transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-        singlemeshmatrix = new THREE.Matrix4().copy(singlemeshes.matrix);
-
-        let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes,afeterrotation);
-       
-
-        geometry.applyMatrix4(transformation);
-        meshes.updateMatrixWorld();
-      
-       
-          transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-       // const afterfacepostioon=  getFacePositions(geometry, selectedFaceIndex, meshes);
-        singlemeshmatrix = new THREE.Matrix4().copy(singlemeshes.matrix);
-
-        //console.log("afterfacepostion",afterfacepostioon);
-
-
-
-       // console.log(meshes.position);
-       // createAxesLines(geometry)
-
+    let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes,afeterrotation);
+    geometry.applyMatrix4(transformation);
+    meshes.updateMatrixWorld();
+    transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
+    singlemeshmatrix = new THREE.Matrix4().copy(singlemeshes.matrix);
    
     }
 }
@@ -509,32 +437,11 @@ function createAxesLines(mesh) {
     scene.add(yAxisLine);
     scene.add(zAxisLine);
 }
-//createAxesLines(meshes);
-
-function getFaceCenter(geometry, faceIndex) {
-    const vertices = getFaceVerticess(geometry, faceIndex);
-    const center = new THREE.Vector3();
-
-    for (const vertex of vertices) {
-        center.add(vertex);
-    }
-
-    center.divideScalar(vertices.length);
-
-    return center;
-}
 
 function calculateTransformationMatrixs(faceIndex, planeMesh, mesh,facePosition) {
     // Ensure geometry is updated
     mesh.geometry.computeBoundingBox();
-
-    // Update matrix world to ensure accurate transformations
     mesh.updateMatrixWorld();
-
-    // Calculate the position of the selected face
-    //const facePosition = getFacePositions(mesh.geometry, faceIndex,mesh);
-
-    // Get the normal and position of the plane
     const planeNormal = planeMesh.geometry.faces[0].normal.clone().applyQuaternion(planeMesh.quaternion);
     const planePosition = planeMesh.position;
 
@@ -587,9 +494,6 @@ function getFacePositions(geometry, faceIndex, mesh) {
     return globalPosition;
 }
 
-
-
-
 function selectOuterFacesAutomatically(geometry) {
     const faces = geometry.attributes.position.count / 3;
     const selectedFaces = new Set();
@@ -615,10 +519,6 @@ function selectOuterFacesAutomatically(geometry) {
             ) {
                 selectedFaces.add(faceIndex);
             }
-            // console.log(`Processing face: ${faceIndex}`);
-            // console.log(`Selected Faces: ${Array.from(selectedFaces).join(', ')}`);
-            // console.log(`Excluded Faces: ${Array.from(excludedFaces).join(', ')}`);
-
             neighbors.forEach(processFace); // Recursively process neighbors
         }
     };
@@ -632,15 +532,11 @@ function selectOuterFacesAutomatically(geometry) {
 
 }
 const selectedOuterFaces = selectOuterFacesAutomatically(geometry);
- console.log("Selected Outer Faces:", selectedOuterFaces);
+console.log("Selected Outer Faces:", selectedOuterFaces);
  
- function selectLayFlatFacesWithNormals(geometry, selectedOuterFaces, angleSet) {
-    const selectedFacesWithNormals = {
-        
-    };
+function selectLayFlatFacesWithNormals(geometry, selectedOuterFaces, angleSet) {
+    const selectedFacesWithNormals = {};
     
-
-
     selectedOuterFaces.forEach(selectedFaceIndex => {
         const selectedFaceNormal = getFaceNormal(geometry, selectedFaceIndex);
        
@@ -758,8 +654,6 @@ const angleSet = [
     [75, 100],
     [120,136],
     [170,180],[260,282],[350,360],[215,225],[310,315]
-
-  
 ];
 function isNormalInSet(normal, angleSet) {
     // Create a quaternion from the normal
@@ -805,25 +699,14 @@ const angleSets = [
     [215, 225],
     [310, 315]
 ];
-
-// Assuming you have a normal (replace this with your actual normal)
-
-
-
-
-
-
 const selectedLayFlatFacesss = selectLayFlatFacesWithNormals(geometry,selectedOuterFaces,angleSet );
-
-
-
 console.log("Combined Selected Faces:", selectedLayFlatFacesss);
 
-
 const facesss=  getFacePositions(geometry,1070, meshes);
-      console.log("afterrotation",facesss);
 
-      function findFarthestFaces(selectedFacesWithNormals, geometry, mesh) {
+console.log("afterrotation",facesss);
+
+function findFarthestFaces(selectedFacesWithNormals, geometry, mesh) {
         const farthestFaces = {};
     
         for (const direction in selectedFacesWithNormals) {
@@ -894,15 +777,11 @@ const facesss=  getFacePositions(geometry,1070, meshes);
     
     
 const farthestFaces = findFarthestFaces(selectedLayFlatFacesss, geometry,meshes);
+
 console.log("Farthest Faces:", farthestFaces);
 
-
-
-
-
-
-
 let singlemeshes=null;
+
 let negibourefaces = [];
 
 function selectedNeighbours(farthestFaces, geometry) {
@@ -935,11 +814,6 @@ function getFacePosition(geometry, faceIndex) {
     return position;
 }
 
-
-
-
-
-
 function getFaceNormals(geometry, faceIndex) {
     const normal = new THREE.Vector3();
 
@@ -959,6 +833,7 @@ function getFaceNormals(geometry, faceIndex) {
 
     return normal;
 }
+
 const constantPlaneNormal = new THREE.Vector3(0, -1, 0); // Replace with your constant plane normal
 
 function calculateRotationMatrix(selectedFaceNormal, constantPlaneNormal) {
@@ -978,13 +853,9 @@ function calculateRotationMatrix(selectedFaceNormal, constantPlaneNormal) {
     return rotationMatrix;
 }
 
-
-
-
-    // Usage example
-    function animate() {
+function animate() {
         requestAnimationFrame(animate);
-        controls.update(); // Update controls in the animation loop
+        controls.update();
         renderer.render(scene, camera);
     }
 
