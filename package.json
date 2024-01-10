@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "quickhull3d": "^2.1.0",
     "three": "^0.160.0"
   }
 }
