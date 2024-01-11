@@ -56,7 +56,7 @@ function handleFileSelect(event) {
     // Handle mouse click to select face
    // window.removeEventListener('click', onMouseClick);
     // Add the click event listener
-   // window.addEventListener('click', onMouseClick, false);
+   window.addEventListener('click', onMouseClick, false);
     
 
     function onMouseClick(event) {
@@ -71,15 +71,23 @@ function handleFileSelect(event) {
             selectedFaceIndex = intersects[0].faceIndex;
             console.log('Selected Face Index:', selectedFaceIndex);
             findAllNeighboringFaces(geometry, selectedFaceIndex);
+            
             var neigbourface = findAllNeighboringFaces(geometry, selectedFaceIndex);
             console.log("facess", neigbourface);
+           const singlenormal= computeAverageNormal(geometry,neigbourface);
+
+           console.log("singlenormal",singlenormal);
+           const centroids = computeCentroid(geometry, neigbourface, meshes);
+           const averageNormal = computeAverageNormal(geometry,  neigbourface);
+           const planeMesh = createPlaneMesh(averageNormal, 10, 0x00ff00, centroids);
+           scene.add(planeMesh);
+           
 
 
             const selectedFaceNormal = getFaceNormal(geometry, selectedFaceIndex);
             console.log("gotfacenormal",selectedFaceNormal);
-            const result = isNormalInSet(selectedFaceNormal, angleSets);
-            console.log(result);
             
+           
             const filteredNormals = filterNormalsBySelectedFace(geometry, selectedFaceNormal, neigbourface);
            // console.log('Filtered Normals:', filteredNormals);
             highlightFilteredNormals(geometry, selectedFaceIndex, filteredNormals);
@@ -88,6 +96,87 @@ const angless= isAngleInSet(normalss, angleSet)
 console.log("angles",angless);
         }
     }
+
+
+    function computeCentroid(geometry, faceIndices, mesh) {
+        const centroids = faceIndices.map(faceIndex => {
+            const position = getFacePositions(geometry, faceIndex, mesh);
+            const normal = getFaceNormal(geometry, faceIndex);
+    
+            // Log for debugging
+            //console.log(`Face Index: ${faceIndex}, Position: ${JSON.stringify(position)}, Normal: ${JSON.stringify(normal)}`);
+    
+            return position;
+        });
+    
+        const centroid = new THREE.Vector3();
+        centroids.forEach(point => centroid.add(point));
+    
+        centroid.divideScalar(centroids.length);
+    
+        // Log for debugging
+    //    console.log(`Final Centroid: ${JSON.stringify(centroid)}`);
+    
+        return centroid;
+    }
+    
+
+    
+    function createPlaneMesh(normal, size, color, centroids) {
+        // Check if centroids array is empty
+        if (centroids.length === 0) {
+            console.error('Centroids array is empty');
+            return null; // Or handle the error in an appropriate way
+        }
+    
+        // Remove undefined elements from centroids array
+        const validCentroids = centroids.filter(centroid => centroid !== undefined);
+    
+        // Check if there are valid centroids after filtering
+        if (validCentroids.length === 0) {
+            console.error('No valid centroids in the array');
+            return null; // Or handle the error in an appropriate way
+        }
+    
+        // Calculate the average centroid
+        const averageCentroid = validCentroids.reduce((sum, centroid) => sum.add(centroid), new THREE.Vector3()).divideScalar(validCentroids.length);
+    
+        // Create a plane geometry
+        const planeGeometry = new THREE.PlaneGeometry(size, size);
+    
+        // Create a material
+        const planeMaterial = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
+    
+        // Create the plane mesh
+        const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+    
+        // Set the position of the plane based on the average centroid
+        planeMesh.position.copy(averageCentroid);
+    
+        // Align the plane with the average normal
+        const up = new THREE.Vector3(0, 1, 0); // or any other vector not parallel to the normal
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal.clone().normalize());
+        planeMesh.quaternion.copy(quaternion);
+    
+        return planeMesh;
+    }
+    
+    
+    
+
+    function computeAverageNormal(geometry, faceIndices) {
+        const normal = new THREE.Vector3();
+    
+        for (const faceIndex of faceIndices) {
+            const faceNormal = getFaceNormal(geometry, faceIndex);
+            normal.add(faceNormal);
+        }
+    
+        normal.divideScalar(faceIndices.length).normalize();
+    
+        return normal;
+    }
+    
 
     function findAllNeighboringFaces(geometry, selectedFaceIndex) {
         const faces = geometry.attributes.position.count / 3;
@@ -711,38 +800,40 @@ const selectedOuterFaces = selectOuterFacesAutomatically(geometry);
 console.log("Selected Outer Faces:", selectedOuterFaces);
  
 function selectLayFlatFacesWithNormals(geometry, selectedOuterFaces, angleSet) {
-    const selectedFacesWithNormals = {};
-    
+    const flatfaces = {};
+
     selectedOuterFaces.forEach(selectedFaceIndex => {
         const selectedFaceNormal = getFaceNormal(geometry, selectedFaceIndex);
-       
+
         // Check if the face normal is within the specified angle set
-        const result = isNormalInSet(selectedFaceNormal, angleSet);
+        const result =isAngleInSet(selectedFaceNormal, angleSet);
         if (result.isInSet) {
-            // Get the direction label for the normal
-            const directionLabel = getDirectionLabel(selectedFaceNormal);
+            const angles = result.angle;
+            const direction = getDirectionLabel(selectedFaceNormal);
+
+            // Initialize the angles entry if it doesn't exist
+            if (!flatfaces[angles]) {
+                flatfaces[angles] = {};
+            }
 
             // Initialize the direction entry if it doesn't exist
-            if (!selectedFacesWithNormals[directionLabel]) {
-                selectedFacesWithNormals[directionLabel] = {
-                    Normals: [],
-                    faceIndices: [],
-                    angle:null
+            if (!flatfaces[angles][direction]) {
+                flatfaces[angles][direction] = {
+                    normals: [],
+                    faceIndices: []
                 };
-             
             }
 
             // Add the current normal and face index to the direction entry
-            selectedFacesWithNormals[directionLabel].Normals.push(selectedFaceNormal);
-            selectedFacesWithNormals[directionLabel].faceIndices.push(selectedFaceIndex);
-            selectedFacesWithNormals[directionLabel].angle=result.angle; 
+            flatfaces[angles][direction].normals.push(selectedFaceNormal);
+            flatfaces[angles][direction].faceIndices.push(selectedFaceIndex);
         }
     });
 
-
-    return selectedFacesWithNormals;
+    return flatfaces;
 }
-function getDirectionLabel(normal, threshold = 0.99, zeroThreshold = 0.1) {
+
+function getDirectionLabel(normal, threshold = 0.99, thresholdmin=0.2,thresholdMax=0.9) {
     const epsilon = 1e-6; // A small value to handle rounding errors
 
     if (normal.x > threshold) {
@@ -770,10 +861,9 @@ function getDirectionLabel(normal, threshold = 0.99, zeroThreshold = 0.1) {
     } else if (Math.abs(normal.x) < threshold && Math.abs(normal.y) < threshold && Math.abs(normal.z) < epsilon) {
         return 'yz'; // plane between y and z
     } else if (
-        Math.abs(normal.x)  < threshold &&
-        Math.abs(normal.y)  < threshold &&
-        Math.abs(normal.z)  < threshold
-        
+        Math.abs(normal.x)  >= thresholdmin &&  Math.abs(normal.x)  <= thresholdMax,
+        Math.abs(normal.y)  >= thresholdmin &&  Math.abs(normal.y)  <= thresholdMax,
+        Math.abs(normal.y)  >= thresholdmin &&  Math.abs(normal.y)  <= thresholdMax
     ) {
        
         return 'xyz'; // Zero in all directions
@@ -784,6 +874,7 @@ function getDirectionLabel(normal, threshold = 0.99, zeroThreshold = 0.1) {
 
 
 
+const epsilon = 1e-6; // A small value to handle rounding errors
 function isAngleInSet(normal, angleSet) {
     // Ensure the normal vector is normalized
     const length = Math.sqrt(normal.x ** 2 + normal.y ** 2 + normal.z ** 2);
@@ -811,70 +902,14 @@ function isAngleInSet(normal, angleSet) {
     // Round the angle to the nearest integer
     degrees = Math.round(degrees);
 
-    let isInSet = false;
-    for (const range of angleSet) {
-        const [min, max] = range;
-        if (degrees >= min && degrees <= max) {
-            isInSet = true;
-            break;
-        }
-    }
+    const isInSet = angleSet.includes(degrees);
 
    
     return { angle: degrees, isInSet };
 }
 
-const angleSet = [
-    [0, 1],
-    [40, 46],
-    [75, 100],
-    [120,136],
-    [170,180],[260,282],[350,360],[215,225],[310,315]
-];
-function isNormalInSet(normal, angleSet) {
-    // Create a quaternion from the normal
-    const quaternion = new THREE.Quaternion();
-    quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(normal.x, normal.y, normal.z));
+const angleSet = [0, 45, 90, 70,135, 180,225,270,360];
 
-    // Extract rotation axis and angle from the quaternion
-    const rotationAxis = new THREE.Vector3();
-    const rotationAngle = quaternion.angleTo(new THREE.Quaternion());
-
-    // Convert the angle to degrees and ensure it's within [0, 360] degrees
-    let degrees = THREE.MathUtils.radToDeg(rotationAngle);
-    degrees = (degrees + 360) % 360;
-
-    // Adjust for negative angles
-    if (degrees < 0) {
-        degrees += 360;
-    }
-
-    // Round the angle to the nearest integer
-    degrees = Math.round(degrees);
-
-    let isInSet = false;
-    for (const range of angleSet) {
-        const [min, max] = range;
-        if (degrees >= min && degrees <= max) {
-            isInSet = true;
-            break;
-        }
-    }
-
-    return { angle: degrees, isInSet };
-}
-
-const angleSets = [
-    [0, 1],
-    [40, 55],
-    [75, 100],
-    [120, 136],
-    [170, 180],
-    [260, 282],
-    [350, 360],
-    [215, 225],
-    [310, 315]
-];
 const selectedLayFlatFacesss = selectLayFlatFacesWithNormals(geometry,selectedOuterFaces,angleSet );
 console.log("Combined Selected Faces:", selectedLayFlatFacesss);
 
@@ -952,9 +987,9 @@ function findFarthestFaces(selectedFacesWithNormals, geometry, mesh) {
     }
     
     
-const farthestFaces = findFarthestFaces(selectedLayFlatFacesss, geometry,meshes);
+//const farthestFaces = findFarthestFaces(selectedLayFlatFacesss, geometry,meshes);
 
-console.log("Farthest Faces:", farthestFaces);
+//console.log("Farthest Faces:", farthestFaces);
 
 let singlemeshes=null;
 
