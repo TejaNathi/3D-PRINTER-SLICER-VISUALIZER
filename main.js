@@ -41,16 +41,23 @@ window.addEventListener('mousedown', (event) => {
 let selectedFaceIndex = null;
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+function handleFileSelect(event) {
+    const file = event.target.files[0];
 
-// Load STL model
-loader.load('voron 2.stl', function (geometry) {
+    if (file) {
+        const loader = new STLLoader();
+        loader.load(URL.createObjectURL(file), function (geometry) {
     const material = new THREE.MeshNormalMaterial();
     const meshes = new THREE.Mesh(geometry, material);
     meshes.position.set(0, 0, 0);
     scene.add(meshes);
-
+    fileInput.value = '';
     // Handle mouse click to select face
-    window.addEventListener('click', onMouseClick, false);
+   // window.removeEventListener('click', onMouseClick);
+    // Add the click event listener
+   // window.addEventListener('click', onMouseClick, false);
+    
 
     function onMouseClick(event) {
         event.preventDefault();
@@ -99,6 +106,167 @@ console.log("angles",angless);
        // console.log("neighbours", neighbors);
         return neighbors;
     }
+    let isDragging = false;
+    let isrotating=false
+
+// Offset between intersection point and click position
+const dragOffset = new THREE.Vector3();
+
+let isRotationEventAttached = false;
+
+document.getElementById('rotationButton').addEventListener('click', function () {
+
+    if (!isRotationEventAttached) {
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        isRotationEventAttached = true;
+    } else {
+        document.removeEventListener('mousedown', onMouseDown);
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        isRotationEventAttached = false;
+        
+    }
+});
+
+
+
+let previousMousePosition = {
+    x: 0,
+    y: 0
+};
+// Disable OrbitControls on mousedown if ray intersects the mesh
+function onMouseDown(event) {
+    event.preventDefault();
+
+    // Set mouse coordinates
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Update the raycaster
+    raycaster.setFromCamera(mouse, camera);
+
+    // Check for intersections
+    const intersects = raycaster.intersectObject(meshes);
+
+    if (intersects.length > 0) {
+        isrotating = true;
+        isDragging=false
+
+        // Calculate the offset between intersection point and click position
+        dragOffset.copy(intersects[0].point).sub(meshes.position);
+
+        // Disable OrbitControls
+        controls.enabled = false;
+    }
+}
+
+
+// Move the mesh on mousemove if dragging
+function onMouseMove(event) {
+    event.preventDefault();
+
+    if (isrotating) {
+        // Update the mouse coordinates
+        const currentMousePosition = {
+            x: event.clientX,
+            y: event.clientY
+        };
+    
+        const deltaX = currentMousePosition.x - previousMousePosition.x;
+    
+        // Step 4: Apply Rotation
+        meshes.rotation.y += deltaX * 0.01; 
+        
+        meshes.verticesNeedUpdate=true
+        meshes.normalsNeedUpdate=true;
+       
+        meshes.updateMatrixWorld();
+        let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
+       console.log("mesh matrix",transformationMatrixss);
+
+    
+        // Update previous mouse position
+        previousMousePosition = currentMousePosition;
+    }
+}
+
+// Enable OrbitControls on mouseup
+function onMouseUp() {
+    isrotating = false;
+
+    // Enable OrbitControls
+    controls.enabled = true;
+}
+
+
+
+document.addEventListener('mousedown',  onobject);
+        document.addEventListener('mousemove', onobjectmove);
+        document.addEventListener('mouseup', onup);
+
+
+function onobject(event) {
+    event.preventDefault();
+
+    // Set mouse coordinates
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Update the raycaster
+    raycaster.setFromCamera(mouse, camera);
+
+    // Check for intersections
+    const intersects = raycaster.intersectObject(meshes);
+
+    if (intersects.length > 0) {
+        isDragging = true;
+
+        // Calculate the offset between intersection point and click position
+        dragOffset.copy(intersects[0].point).sub(meshes.position);
+
+        // Disable OrbitControls
+        controls.enabled = false;
+    }
+}
+
+
+// Move the mesh on mousemove if dragging
+function onobjectmove(event) {
+    event.preventDefault();
+    
+
+        if (isDragging) {
+            // Update the mouse coordinates
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+            // Update the raycaster
+            raycaster.setFromCamera(mouse, camera);
+    
+            // Raycast to find the intersection point
+            const intersects = raycaster.intersectObject(meshes);
+    
+            if (intersects.length > 0) {
+                // Update only the X and Z components of the mesh's position
+                meshes.position.x = intersects[0].point.x - dragOffset.x;
+                meshes.position.z = intersects[0].point.z - dragOffset.z;
+            
+        }}
+}
+
+// Enable OrbitControls on mouseup
+function onup() {
+    isDragging = false;
+
+    // Enable OrbitControls
+    controls.enabled = true;
+}
+
+
+
+
 
     
    
@@ -223,30 +391,14 @@ let normalSum=null;
 let isMouseDownEventAttached = false;
 
 document.getElementById('layflat').addEventListener('click', function () {
-//   let rotionofcube=calculateRotationMatrix(normalSum,constantPlaneNormal);
-//   let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-//   console.log("mesh matrix",transformationMatrixss);
 
-
-
-//   // Multiply the mesh matrix with the rotation matrix
-//   const combinedMatrix = new THREE.Matrix4().multiplyMatrices(transformationMatrixss,rotionofcube);
-//   // Apply the new rotation to the existing matrix
-  
-
-
-//   // Apply the combined transformation to the mesh
-//  meshes.applyMatrix4(combinedMatrix);
-//   geometry.verticesNeedUpdate = true; // Update vertices if necessary
-//   geometry.normalsNeedUpdate = true;
-//   geometry.positionNeedUpdate = true;
-//   console.log(meshes.position);
-document.addEventListener('mousedown', onMouseClicksss, false);
-
-isMouseDownEventAttached = true;
-  // CreateAxesLines should be called outside the click event for efficiency
- // createAxesLines(meshes);
-
+    if (!isMouseDownEventAttached) {
+        document.addEventListener('mousedown', onMouseClicksss, false);
+        isMouseDownEventAttached = true;
+    } else {
+        document.removeEventListener('mousedown', onMouseClicksss, false);
+        isMouseDownEventAttached = false;
+    }
 });
 // const neigbourfacesss = findAllNeighboringFaces(geometry, 58);
 //    console.log("negia",neigbourfacesss);
@@ -362,6 +514,30 @@ function getFaceNormal(geometry, faceIndex) {
     return vertices;
 }
 
+const initialBoundingBox = new THREE.Box3().setFromObject(meshes);
+
+// Create a wireframe box to represent the bounding box
+const wireframeMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
+const wireframeGeometry = new THREE.BoxGeometry();
+const boundingBoxWireframe = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
+scene.add(boundingBoxWireframe);
+
+// Function to update the bounding box based on the mesh
+function updateBoundingBox(mesh) {
+    // Update the bounding box wireframe based on the current state of the mesh
+    yourMesh.updateMatrixWorld(); // Ensure the matrixWorld is up to date
+
+    // Extract the vertices of the initial bounding box
+    const vertices = initialBoundingBox.clone().applyMatrix4(mesh.matrixWorld).toArray();
+
+    // Update the bounding box wireframe vertices
+    for (let i = 0; i < boundingBoxGeometry.vertices.length; i++) {
+        boundingBoxGeometry.vertices[i].fromArray(vertices, i * 3);
+    }
+
+    boundingBoxGeometry.verticesNeedUpdate = true;
+}
+
 let transformationMatrixss =null;
 
 function onMouseClicksss(event) {
@@ -378,39 +554,39 @@ function onMouseClicksss(event) {
         const beforroation=  getFacePositions(geometry, selectedFaceIndex, meshes);
        console.log("beforerotationface",beforroation);
         
-        
+       meshes.rotation.set(0, 0, 0);
         let selectedFaceNormals =getFaceNormal(geometry, selectedFaceIndex);
         console.log('Selected Face Normals:', selectedFaceNormals);
     const   angles = isAngleInSet( selectedFaceNormals, angleSet)
     console.log("angless",angles);
-    singlemeshes.updateMatrixWorld();
+   // singlemeshes.updateMatrixWorld();
       //  let boxmatrixss=planes.matrix.identity();
        // console.log("boxesmatrixss",boxmatrixss);
         let rotationMatrix = calculateRotationMatrix(selectedFaceNormals, constantPlaneNormal);
        
        
         let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-       // console.log("mesh matrix",transformationMatrixss);
-     let singlemeshmatrix= new THREE.Matrix4().copy(singlemeshes.matrix);
+       console.log("mesh matrix",transformationMatrixss);
+    
    //console.log("singlmesh".singlemesh);
 
     
         // Multiply the mesh matrix with the rotation matrix
      const combinedMatrix = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,rotationMatrix);
         // Apply the new rotation to the existing matrix
-    const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( singlemeshmatrix,rotationMatrix);
+   
     geometry.applyMatrix4(combinedMatrix);
      meshes.updateMatrixWorld();
     const afeterrotation=  getFacePositions(geometry, selectedFaceIndex, meshes);
     geometry.normalsNeedUpdate = true;
     transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-    singlemeshmatrix = new THREE.Matrix4().copy(singlemeshes.matrix);
+    console.log("afterrotationmatrix",transformationMatrixss);
 
     let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes,afeterrotation);
-    geometry.applyMatrix4(transformation);
+    const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,transformation);
+    geometry.applyMatrix4(combinedMatrixs);
     meshes.updateMatrixWorld();
     transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-    singlemeshmatrix = new THREE.Matrix4().copy(singlemeshes.matrix);
    
     }
 }
@@ -800,7 +976,7 @@ function selectedNeighbours(farthestFaces, geometry) {
 singlemeshes.quaternion.copy(meshes.quaternion);
 }
 //console.log("mesd",singlemeshes);
-selectedNeighbours(farthestFaces, geometry);
+//selectedNeighbours(farthestFaces, geometry);
 function getFacePosition(geometry, faceIndex) {
     const vertices = getFaceVertices(geometry, faceIndex);
 
@@ -853,13 +1029,17 @@ function calculateRotationMatrix(selectedFaceNormal, constantPlaneNormal) {
     return rotationMatrix;
 }
 
-function animate() {
-        requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
-    }
-
-    animate();
 }, undefined, function (error) {
     console.error('Error loading STL file:', error);
 });
+
+
+}}
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+animate();
