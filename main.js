@@ -4,10 +4,14 @@
 
 // Create scene
 //import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.120.1/build/three.module.js';
-import * as Oribtcontrols from"https://cdn.jsdelivr.net/npm/three@0.114/examples/js/controls/OrbitControls.js"
-import Stats from 'https://cdn.jsdelivr.net/npm/three@0.120.1/examples/jsm/libs/stats.module.min.js';
+
 import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.120.1/examples/jsm/loaders/STLLoader.js';
 //import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { quickHull } from './quickHull.mjs';
+import * as layflat from './Layflatnormal.mjs';
+
+
+
 const loader = new STLLoader();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight);
@@ -27,9 +31,117 @@ const faceIndex = 0; // You can change this index based on your requirements
 const faceNormal = new THREE.Vector3();
 planeGeometry.faces[faceIndex].normal.clone(faceNormal);
 
-var controls = new THREE.OrbitControls( camera, renderer.domElement );
-controls.enableDamping = true;
+const constantPlaneNormal = new THREE.Vector3(0, -1, 0);
+// //var controls = new THREE.OrbitControls( camera, renderer.domElement );
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+ controls.enableDamping = true;
 
+const circleGeometry = new THREE.CircleGeometry(30, 50); // Radius: 50, Segments: 32
+const circleMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+const circleMesh = new THREE.LineLoop(circleGeometry, circleMaterial);
+circleMesh.rotation.x = Math.PI / 2;
+circleMesh.visible=false;
+// Add the circle to the scene
+scene.add(circleMesh);
+
+// Add radial lines to represent specific degrees
+const degrees = [0,45, 90, 135, 180, 225, 270, 360];
+const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+
+degrees.forEach(degree => {
+  const angleInRadians = (degree / 180) * Math.PI;
+  const x = 30 * Math.cos(angleInRadians);
+  const y = 30 * Math.sin(angleInRadians);
+
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(x, y, 0)
+  ]);
+
+  const line = new THREE.Line(lineGeometry, lineMaterial);
+  circleMesh.add(line);
+});
+function createPlaneMesh(center, normal, dimensions, color) {
+    const epsilon = 1e-6; // A small value to handle rounding errors
+
+    // Check if dimensions.width is close to zero
+    if (Math.abs(dimensions.width) < epsilon) {
+        // Set dimensions.width to a small positive value
+        dimensions.width = epsilon;
+    }
+
+    // Check if dimensions.height is close to zero
+    if (Math.abs(dimensions.height) < epsilon) {
+        // Set dimensions.height to a small positive value
+        dimensions.height = epsilon;
+    }
+
+    // Check if dimensions.depth is close to zero
+    if (Math.abs(dimensions.depth) < epsilon) {
+        // Set dimensions.depth to a small positive value
+        dimensions.depth = epsilon;
+    }
+
+    // If width is zero, set depth to dimensions.width
+    if (Math.abs(dimensions.width) < epsilon) {
+        dimensions.depth = dimensions.width;
+    }
+
+    // If height is zero, set depth to dimensions.height
+    if (Math.abs(dimensions.height) < epsilon) {
+        dimensions.depth = dimensions.height;
+    }
+
+    // Calculate the orientation of the plane based on the normal vector
+    const orientation = new THREE.Matrix4();
+    const up = new THREE.Vector3(0, 1, 0); // Assuming up direction is y-axis
+    orientation.lookAt(new THREE.Vector3(), normal, up);
+
+    // Create a plane geometry
+    const planeGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height);
+
+    // If width is zero, set depth to dimensions.width
+    if (Math.abs(dimensions.width) < epsilon) {
+        planeGeometry.parameters.width = dimensions.depth;
+        planeGeometry.parameters.height = dimensions.height;
+    }
+
+    // If height is zero, set depth to dimensions.height
+    if (Math.abs(dimensions.height) < epsilon) {
+        planeGeometry.parameters.width = dimensions.width;
+        planeGeometry.parameters.height = dimensions.depth;
+    }
+
+    // Apply the orientation and position to the geometry
+    planeGeometry.applyMatrix4(orientation);
+    planeGeometry.translate(center.x, center.y, center.z);
+
+    // Create a material (you can customize this based on your needs)
+    const material = new THREE.MeshPhongMaterial({ color: color || 0xff0000, side: THREE.DoubleSide });
+
+    // Create a mesh using the geometry and material
+    const planeMesh = new THREE.Mesh(planeGeometry, material);
+
+    return planeMesh;
+}
+
+
+// Example usage:
+const center = new THREE.Vector3(12.852703094482422, 12.963041305541992, 13.02743911743164);
+const normal = new THREE.Vector3(0.577, 0.577, 0.577); // Example normal (adjust as needed)
+const dimensions = { width: 5, height: 5 }; // Example dimensions (adjust as needed)
+const color = 0xff0000; // Red color (adjust as needed)
+
+const planeMesh = createPlaneMesh(center, normal, dimensions, color);
+scene.add(planeMesh);
+console.log("plane",planeMesh);
+
+
+
+let boundingBoxMesh=null;
+let boundingBox=null;
+let selectedMesh = null;
+const boundingBoxCenter = new THREE.Vector3();
 window.addEventListener('resize', (event) => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
@@ -44,15 +156,74 @@ const mouse = new THREE.Vector2();
 document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 function handleFileSelect(event) {
     const file = event.target.files[0];
+    let meshes=null;
+    let geometrys =null;
 
     if (file) {
         const loader = new STLLoader();
         loader.load(URL.createObjectURL(file), function (geometry) {
     const material = new THREE.MeshNormalMaterial();
-    const meshes = new THREE.Mesh(geometry, material);
+     meshes = new THREE.Mesh(geometry, material);
     meshes.position.set(0, 0, 0);
     scene.add(meshes);
-    fileInput.value = '';
+    geometrys=meshes.geometry;
+    
+if(geometrys!=null){
+    // Assuming 'mesh' is your three.js mesh object
+boundingBox = new THREE.Box3().setFromObject(meshes);
+
+// Create a wireframe material for the bounding box
+const wireframeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+const wireframeGeometry = new THREE.BoxGeometry(
+  boundingBox.max.x - boundingBox.min.x,
+  boundingBox.max.y - boundingBox.min.y,
+  boundingBox.max.z - boundingBox.min.z
+  
+);
+boundingBoxMesh = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
+boundingBoxMesh.visible = false;
+
+boundingBox.getCenter(boundingBoxCenter);
+boundingBoxMesh.position.copy(boundingBoxCenter);
+// Add the bounding box to the scene
+scene.add(boundingBoxMesh);
+    const selectedOuterFaces =layflat.selectOuterFacesAutomatically(geometrys);
+    console.log("Selected Outer Faces:", selectedOuterFaces);
+    const selectedLayFlatFacesss = layflat.selectLayFlatFacesWithNormals(geometrys,selectedOuterFaces );
+    console.log("Combined Selected Faces:", selectedLayFlatFacesss);
+   //selectedNeighbours(geometrys,selectedOuterFaces)
+    
+
+ 
+    }
+    meshes.userData = { file };
+
+    meshes.addEventListener('click', function () {
+        if (selectedMesh) {
+            selectedMesh.material.emissive.setHex(0x000000);
+            console.log("slectdmesh",selectedMesh);
+        }
+
+        selectedMesh = mesh;
+        mesh.material.emissive.setHex(0x00ff00);
+    });
+
+        fileInput.value = '';
+        console.log("geometrys",geometrys);
+    
+    
+        });}
+        
+
+// Handle mesh cloning
+document.getElementById('cloneButton').addEventListener('click', function () {
+    if (selectedMesh) {
+        const clonedMesh = selectedMesh.clone();
+        clonedMesh.position.x += 2;
+        scene.add(clonedMesh);
+    }
+});
+
     // Handle mouse click to select face
    // window.removeEventListener('click', onMouseClick);
     // Add the click event listener
@@ -70,112 +241,104 @@ function handleFileSelect(event) {
         if (intersects.length > 0) {
             selectedFaceIndex = intersects[0].faceIndex;
             console.log('Selected Face Index:', selectedFaceIndex);
-            findAllNeighboringFaces(geometry, selectedFaceIndex);
+        //    findAllNeighboringFaces(geometrys, selectedFaceIndex);
             
-            var neigbourface = findAllNeighboringFaces(geometry, selectedFaceIndex);
+            var neigbourface = findAllNeighboringFaces(geometrys, selectedFaceIndex);
             console.log("facess", neigbourface);
-           const singlenormal= computeAverageNormal(geometry,neigbourface);
+         
+const centerOfNeighboringFaces = findCenterOfNeighboringFaces(geometrys, neigbourface,selectedFaceIndex );
+const dimensionsOfCombinedFace = findCombinedFaceDimensions(geometrys, neigbourface,selectedFaceIndex);
 
-           console.log("singlenormal",singlenormal);
-           const centroids = computeCentroid(geometry, neigbourface, meshes);
-           const averageNormal = computeAverageNormal(geometry,  neigbourface);
-           const planeMesh = createPlaneMesh(averageNormal, 10, 0x00ff00, centroids);
-           scene.add(planeMesh);
+
+console.log("Center of Neighboring Faces:", centerOfNeighboringFaces);
+ console.log("Dimensions of Combined Face:", dimensionsOfCombinedFace);
+// const lineGeometry = new THREE.Geometry();
+// lineGeometry.vertices.push(centerOfNeighboringFaces, new THREE.Vector3(0, 0, 0));
+// const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+// const line = new THREE.Line(lineGeometry, lineMaterial);
+// scene.add(line);
+// const planeMesh = createPlaneGeometry(centerOfNeighboringFaces, dimensionsOfCombinedFace);
+// scene.add(planeMesh);
+
+
+
+          // const singlenormal= computeAverageNormal(geometry,neigbourface);
+
+         //  console.log("singlenormal",singlenormal);
+         //  const centroids = computeCentroid(geometry, neigbourface, meshes);
+         //  const averageNormal = computeAverageNormal(geometry,  neigbourface);
+         //  const planeMesh = createPlaneMesh(averageNormal, 10, 0x00ff00, centroids);
+         //  scene.add(planeMesh);
            
 
 
-            const selectedFaceNormal = getFaceNormal(geometry, selectedFaceIndex);
-            console.log("gotfacenormal",selectedFaceNormal);
+            const selectedFaceNormal = getFaceNormal(geometrys, selectedFaceIndex);
+           console.log("gotfacenormal",selectedFaceNormal);
             
            
-            const filteredNormals = filterNormalsBySelectedFace(geometry, selectedFaceNormal, neigbourface);
+            //const filteredNormals = filterNormalsBySelectedFace(geometrys, selectedFaceNormal, neigbourface);
            // console.log('Filtered Normals:', filteredNormals);
-            highlightFilteredNormals(geometry, selectedFaceIndex, filteredNormals);
-            const normalss = getFaceNormal(geometry,selectedFaceIndex);
+          //  highlightFilteredNormals(geometrys, selectedFaceIndex, neigbourface);
+            const normalss = getFaceNormal(geometrys,selectedFaceIndex);
 const angless= isAngleInSet(normalss, angleSet)
-console.log("angles",angless);
+ console.log("angles",angless);
         }
     }
-
-
-    function computeCentroid(geometry, faceIndices, mesh) {
-        const centroids = faceIndices.map(faceIndex => {
-            const position = getFacePositions(geometry, faceIndex, mesh);
-            const normal = getFaceNormal(geometry, faceIndex);
+    function createPlaneGeometry(center, dimensions) {
+        const halfWidth = dimensions.width / 2;
+        const halfHeight = dimensions.height / 2;
     
-            // Log for debugging
-            //console.log(`Face Index: ${faceIndex}, Position: ${JSON.stringify(position)}, Normal: ${JSON.stringify(normal)}`);
-    
-            return position;
-        });
-    
-        const centroid = new THREE.Vector3();
-        centroids.forEach(point => centroid.add(point));
-    
-        centroid.divideScalar(centroids.length);
-    
-        // Log for debugging
-    //    console.log(`Final Centroid: ${JSON.stringify(centroid)}`);
-    
-        return centroid;
-    }
-    
-
-    
-    function createPlaneMesh(normal, size, color, centroids) {
-        // Check if centroids array is empty
-        if (centroids.length === 0) {
-            console.error('Centroids array is empty');
-            return null; // Or handle the error in an appropriate way
-        }
-    
-        // Remove undefined elements from centroids array
-        const validCentroids = centroids.filter(centroid => centroid !== undefined);
-    
-        // Check if there are valid centroids after filtering
-        if (validCentroids.length === 0) {
-            console.error('No valid centroids in the array');
-            return null; // Or handle the error in an appropriate way
-        }
-    
-        // Calculate the average centroid
-        const averageCentroid = validCentroids.reduce((sum, centroid) => sum.add(centroid), new THREE.Vector3()).divideScalar(validCentroids.length);
-    
-        // Create a plane geometry
-        const planeGeometry = new THREE.PlaneGeometry(size, size);
-    
-        // Create a material
-        const planeMaterial = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
-    
-        // Create the plane mesh
+        const planeGeometry = new THREE.PlaneBufferGeometry(dimensions.width, dimensions.height);
+        const planeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
         const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
     
-        // Set the position of the plane based on the average centroid
-        planeMesh.position.copy(averageCentroid);
+        // Set the position of the plane based on the center
+        planeMesh.position.copy(center);
     
-        // Align the plane with the average normal
-        const up = new THREE.Vector3(0, 1, 0); // or any other vector not parallel to the normal
-        const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal.clone().normalize());
-        planeMesh.quaternion.copy(quaternion);
+        // Adjust the position to correctly center the plane
+        planeMesh.position.x -= halfWidth;
+        planeMesh.position.y -= halfHeight;
     
         return planeMesh;
     }
+    function isAngleInSet(normal, angleSet) {
+        // Ensure the normal vector is normalized
+        const length = Math.sqrt(normal.x ** 2 + normal.y ** 2 + normal.z ** 2);
+        const normalizedNormal = {
+            x: normal.x / length,
+            y: normal.y / length,
+            z: normal.z / length,
+        };
+    
+        // Calculate the angle in radians using atan2, considering all three components
+        const angle = Math.atan2(normalizedNormal.y, normalizedNormal.x, normalizedNormal.z);
     
     
+        // Convert the angle to degrees and ensure it's within [0, 360] degrees
+        let degrees = (angle * 180) / Math.PI;
+        
+        degrees = (degrees + 360) % 360;
+       // console.log("degree",degrees);
     
-
-    function computeAverageNormal(geometry, faceIndices) {
-        const normal = new THREE.Vector3();
-    
-        for (const faceIndex of faceIndices) {
-            const faceNormal = getFaceNormal(geometry, faceIndex);
-            normal.add(faceNormal);
+        // Adjust for negative angles
+        if (degrees < 0) {
+            degrees += 360;
         }
     
-        normal.divideScalar(faceIndices.length).normalize();
+        // Round the angle to the nearest integer
+        degrees = Math.round(degrees);
     
-        return normal;
+        const isInSet = angleSet.includes(degrees);
+    
+       
+        return { angle: degrees, isInSet };
     }
+    
+    const angleSet = [0, 45, [90,95], 70,135, 180,225,270,360,315];
+
+    
+    // Usage
+    
     
 
     function findAllNeighboringFaces(geometry, selectedFaceIndex) {
@@ -210,11 +373,13 @@ document.getElementById('rotationButton').addEventListener('click', function () 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
         isRotationEventAttached = true;
+        circleMesh.visible=true;
     } else {
         document.removeEventListener('mousedown', onMouseDown);
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
         isRotationEventAttached = false;
+        circleMesh.visible=false;
         
     }
 });
@@ -237,7 +402,7 @@ function onMouseDown(event) {
     raycaster.setFromCamera(mouse, camera);
 
     // Check for intersections
-    const intersects = raycaster.intersectObject(meshes);
+    const intersects = raycaster.intersectObject(boundingBoxMesh);
 
     if (intersects.length > 0) {
         isrotating = true;
@@ -245,45 +410,74 @@ function onMouseDown(event) {
 
         // Calculate the offset between intersection point and click position
         dragOffset.copy(intersects[0].point).sub(meshes.position);
+        meshes.verticesNeedUpdate=true
+        meshes.normalsNeedUpdate=true;
+
+       
+        meshes.updateMatrixWorld();
 
         // Disable OrbitControls
-        controls.enabled = false;
+       
     }
 }
 
-
+const rotationAxis = new THREE.Vector3(0, 1, 0);
 // Move the mesh on mousemove if dragging
 function onMouseMove(event) {
     event.preventDefault();
 
     if (isrotating) {
-        // Update the mouse coordinates
-        const currentMousePosition = {
-            x: event.clientX,
-            y: event.clientY
-        };
-    
-        const deltaX = currentMousePosition.x - previousMousePosition.x;
-    
-        // Step 4: Apply Rotation
-        meshes.rotation.y += deltaX * 0.01; 
-        
-        meshes.verticesNeedUpdate=true
-        meshes.normalsNeedUpdate=true;
-       
-        meshes.updateMatrixWorld();
-        let transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
-       console.log("mesh matrix",transformationMatrixss);
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
+        raycaster.setFromCamera(mouse, camera);
+
+        const intersects = raycaster.intersectObject(boundingBoxMesh);
+
+        if (intersects.length > 0) {
+            const deltaX = mouse.x - previousMousePosition.x;
+            const angle = deltaX * 10;
+
+            boundingBoxMesh.rotateOnWorldAxis(rotationAxis, angle);
+
+            boundingBox.setFromObject(boundingBoxMesh);
+            boundingBox.getCenter(boundingBoxCenter);
+            createAxesLines(boundingBoxMesh);
+            circleMesh.position.copy(boundingBoxCenter)
+        
     
-        // Update previous mouse position
-        previousMousePosition = currentMousePosition;
+            // Update the rotation of the mesh to match the bounding box
+          //  mesh.rotation.copy(boundingBoxMesh.rotation);
+          
+           // meshes.position.copy(boundingBoxMesh.position);
+            meshes.rotation.copy(boundingBoxMesh.rotation);
+        }
+
+        previousMousePosition = { x: mouse.x, y: mouse.y };
     }
 }
+
+
+
+
 
 // Enable OrbitControls on mouseup
 function onMouseUp() {
     isrotating = false;
+  geometrys.verticesNeedUpdate=true
+    geometrys.normalsNeedUpdate=true;
+    
+  
+               
+                meshes.updateMatrixWorld();
+   
+    meshes.updateMatrixWorld();
+    boundingBox.setFromObject(meshes);
+    boundingBox.getCenter(boundingBoxCenter);
+    boundingBoxMesh.position.copy(boundingBoxCenter);
+    boundingBoxMesh.rotation.copy(meshes.rotation);
+    
+   
 
     // Enable OrbitControls
     controls.enabled = true;
@@ -324,30 +518,55 @@ function onobject(event) {
 // Move the mesh on mousemove if dragging
 function onobjectmove(event) {
     event.preventDefault();
-    
 
-        if (isDragging) {
-            // Update the mouse coordinates
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-            // Update the raycaster
-            raycaster.setFromCamera(mouse, camera);
-    
-            // Raycast to find the intersection point
-            const intersects = raycaster.intersectObject(meshes);
-    
-            if (intersects.length > 0) {
-                // Update only the X and Z components of the mesh's position
-                meshes.position.x = intersects[0].point.x - dragOffset.x;
-                meshes.position.z = intersects[0].point.z - dragOffset.z;
-            
-        }}
+    if (isDragging) {
+        // Update the mouse coordinates
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        // Update the raycaster
+        raycaster.setFromCamera(mouse, camera);
+
+        // Raycast to find the intersection point
+        const intersects = raycaster.intersectObject(meshes);
+
+        if (intersects.length > 0) {
+            // Calculate the new position
+            const newX = intersects[0].point.x - dragOffset.x;
+            const newZ = intersects[0].point.z - dragOffset.z;
+
+            // Restrict the movement within the plane boundaries
+            const halfPlaneSize = 50; // Assuming the plane size is 200x200
+            meshes.position.x = THREE.MathUtils.clamp(newX, -halfPlaneSize, halfPlaneSize);
+            meshes.position.z = THREE.MathUtils.clamp(newZ, -halfPlaneSize, halfPlaneSize);
+
+            // Update the geometry and bounding box
+            geometrys.verticesNeedUpdate = true;
+            geometrys.normalsNeedUpdate = true;
+            geometrys.positionNeedYpdate = true;
+
+            meshes.updateMatrixWorld();
+
+            boundingBox.setFromObject(meshes);
+            boundingBox.getCenter(boundingBoxCenter);
+            boundingBoxMesh.position.copy(boundingBoxCenter);
+            createAxesLines(meshes);
+        }
+    }
 }
+// Create a circle geometry
+
 
 // Enable OrbitControls on mouseup
 function onup() {
     isDragging = false;
+    meshes.verticesNeedUpdate=true
+    meshes.normalsNeedUpdate=true;
+    boundingBox.setFromObject(meshes);
+    boundingBox.getCenter(boundingBoxCenter);
+    boundingBoxMesh.position.copy(boundingBoxCenter);
+   
+    meshes.updateMatrixWorld();
 
     // Enable OrbitControls
     controls.enabled = true;
@@ -530,6 +749,10 @@ function containsNaN(array) {
 
 
 
+
+
+
+
 function mergeMeshesIntoSingleMesh(meshes) {
     const mergedGeometry = new THREE.BufferGeometry();
     const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
@@ -603,29 +826,6 @@ function getFaceNormal(geometry, faceIndex) {
     return vertices;
 }
 
-const initialBoundingBox = new THREE.Box3().setFromObject(meshes);
-
-// Create a wireframe box to represent the bounding box
-const wireframeMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
-const wireframeGeometry = new THREE.BoxGeometry();
-const boundingBoxWireframe = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
-scene.add(boundingBoxWireframe);
-
-// Function to update the bounding box based on the mesh
-function updateBoundingBox(mesh) {
-    // Update the bounding box wireframe based on the current state of the mesh
-    yourMesh.updateMatrixWorld(); // Ensure the matrixWorld is up to date
-
-    // Extract the vertices of the initial bounding box
-    const vertices = initialBoundingBox.clone().applyMatrix4(mesh.matrixWorld).toArray();
-
-    // Update the bounding box wireframe vertices
-    for (let i = 0; i < boundingBoxGeometry.vertices.length; i++) {
-        boundingBoxGeometry.vertices[i].fromArray(vertices, i * 3);
-    }
-
-    boundingBoxGeometry.verticesNeedUpdate = true;
-}
 
 let transformationMatrixss =null;
 
@@ -640,14 +840,14 @@ function onMouseClicksss(event) {
     if (intersects.length > 0) {
         selectedFaceIndex = intersects[0].faceIndex;
         console.log('Selected Face Index:', selectedFaceIndex);
-        const beforroation=  getFacePositions(geometry, selectedFaceIndex, meshes);
+        const beforroation=  getFacePositions(geometrys, selectedFaceIndex, meshes);
        console.log("beforerotationface",beforroation);
         
        meshes.rotation.set(0, 0, 0);
-        let selectedFaceNormals =getFaceNormal(geometry, selectedFaceIndex);
+        let selectedFaceNormals =getFaceNormal(geometrys, selectedFaceIndex);
         console.log('Selected Face Normals:', selectedFaceNormals);
-    const   angles = isAngleInSet( selectedFaceNormals, angleSet)
-    console.log("angless",angles);
+    //const   angles = isAngleInSet( selectedFaceNormals, angleSet)
+   // console.log("angless",angles);
    // singlemeshes.updateMatrixWorld();
       //  let boxmatrixss=planes.matrix.identity();
        // console.log("boxesmatrixss",boxmatrixss);
@@ -664,21 +864,70 @@ function onMouseClicksss(event) {
      const combinedMatrix = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,rotationMatrix);
         // Apply the new rotation to the existing matrix
    
-    geometry.applyMatrix4(combinedMatrix);
-     meshes.updateMatrixWorld();
-    const afeterrotation=  getFacePositions(geometry, selectedFaceIndex, meshes);
-    geometry.normalsNeedUpdate = true;
+    geometrys.applyMatrix4(combinedMatrix);
+    // meshes.updateMatrixWorld();
+    const afeterrotation=  getFacePositions(geometrys, selectedFaceIndex, meshes);
+    geometrys.verticesNeedUpdate=true
+    geometrys.normalsNeedUpdate = true;
+    geometrys.positionNeedYpdate=true;
+    meshes.updateMatrixWorld();
     transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
     console.log("afterrotationmatrix",transformationMatrixss);
 
     let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes,afeterrotation);
     const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( transformationMatrixss,transformation);
-    geometry.applyMatrix4(combinedMatrixs);
-    meshes.updateMatrixWorld();
+    
+    console.log("combined matr",combinedMatrixs);
+    geometrys.applyMatrix4(combinedMatrixs);
+   // meshes.updateMatrixWorld();
+    geometrys.verticesNeedUpdate=true
+    geometrys.normalsNeedUpdate=true;
+    geometrys.positionNeedYpdate=true;
+               
+                meshes.updateMatrixWorld();
+                console.log("transformatriaaf",transformationMatrixss)
+                boundingBox.setFromObject(meshes);
+                boundingBox.getCenter(boundingBoxCenter);
+                boundingBoxMesh.position.copy(boundingBoxCenter);
+                boundingBoxMesh.rotation.copy(meshes.rotation);
+               
+
+
+
+               // resetMeshOrigin(meshes, boundingBox)
+  
+                createAxesLines(meshes);
+                 
     transformationMatrixss = new THREE.Matrix4().copy(meshes.matrix);
    
     }
 }
+
+
+function resetMeshOrigin(mesh, boundingBox) {
+    // Get the center of the bounding box
+    boundingBox.setFromObject(boundingBoxMesh);
+ boundingBox.getCenter(boundingBoxCenter);
+
+    // Set the mesh's position to the center of the bounding box
+    const displacement = boundingBoxCenter.clone().sub(mesh.position);
+
+    // Update each vertex in the geometry to move it to the new origin
+    mesh.geometry.vertices.forEach((vertex) => {
+        vertex.sub(displacement);
+    });
+
+    // Update normals and apply changes
+    mesh.geometry.computeVertexNormals();
+    mesh.geometry.verticesNeedUpdate = true;
+    mesh.geometry.normalsNeedUpdate = true;
+
+    // Update the position to the bounding box center
+    mesh.position.copy(boundingBoxCenter);
+
+    // Update the matrix world to apply the changes
+    mesh.updateMatrixWorld();}
+
 
 let xAxisLine, yAxisLine, zAxisLine;
 function createAxesLines(mesh) {
@@ -693,9 +942,9 @@ function createAxesLines(mesh) {
     if (zAxisLine) scene.remove(zAxisLine);
 
     // Create lines along the local coordinate axes
-    xAxisLine = new THREE.ArrowHelper(xAxis, mesh.position, 10, 0xff0000);
-    yAxisLine = new THREE.ArrowHelper(yAxis, mesh.position, 10, 0x00ff00);
-    zAxisLine = new THREE.ArrowHelper(zAxis, mesh.position, 10, 0x0000ff);
+    xAxisLine = new THREE.ArrowHelper(xAxis, mesh.position, 30, 0xff0000);
+    yAxisLine = new THREE.ArrowHelper(yAxis, mesh.position, 30, 0x00ff00);
+    zAxisLine = new THREE.ArrowHelper(zAxis, mesh.position, 30, 0x0000ff);
 
     // Add the lines to the scene
     scene.add(xAxisLine);
@@ -719,21 +968,50 @@ function calculateTransformationMatrixs(faceIndex, planeMesh, mesh,facePosition)
 
     // Get the vertices of the selected face
     const faceVertices = getFaceVertices(mesh.geometry, faceIndex);
+    console.log("faceposition",facePosition);
+    const faceBoundingBox = new THREE.Box3().setFromObject(mesh);
+
+    // Calculate the center of the bounding box
+    const boundingBoxCenter = new THREE.Vector3();
+    faceBoundingBox.getCenter(boundingBoxCenter);
 
     // Calculate the center of the face
     const faceCenter = new THREE.Vector3();
     faceVertices.forEach((vertex) => faceCenter.add(vertex));
     faceCenter.divideScalar(faceVertices.length);
-
+   
     // Create a translation matrix to move the object's origin to the face center and then move up to the top of the plane
     const translationMatrix = new THREE.Matrix4().makeTranslation(
-        -faceCenter.x,
+        -boundingBoxCenter.x,
         faceCenter.y + distanceToPlane,
-        -faceCenter.z
+        -boundingBoxCenter.z
     );
+    mesh.positionNeedUpdate=true;
+    console.log("transla",translationMatrix);
 
+    console.log("facecenter",faceCenter);
     return translationMatrix;
 }
+function resetMeshOrigin(mesh) {
+    // Reset the position of the mesh
+    mesh.position.set(0, 0, 0);
+
+    // Update the matrix world to apply the position change
+    mesh.updateMatrixWorld();
+
+    // Reset the geometry to its center
+    const boundingBox = new THREE.Box3().setFromObject(mesh);
+    const center = new THREE.Vector3();
+    boundingBox.getCenter(center);
+
+    mesh.geometry.translate(-center.x, -center.y, -center.z);
+    mesh.geometry.verticesNeedUpdate = true;
+    mesh.geometry.normalsNeedUpdate = true;
+
+    // Update the matrix world again
+    mesh.updateMatrixWorld();
+}
+
 function getFacePositions(geometry, faceIndex, mesh) {
     const positions = geometry.attributes.position.array;
     const startIndex = faceIndex * 3 * 3;
@@ -749,7 +1027,7 @@ function getFacePositions(geometry, faceIndex, mesh) {
         localPosition.add(new THREE.Vector3(x, y, z));
     }
     localPosition.divideScalar(3);
-    //console.log("local",localPosition);
+    console.log("local",localPosition);
     
 
     // Convert the local face position to global coordinates by applying the mesh's matrixWorld
@@ -759,257 +1037,29 @@ function getFacePositions(geometry, faceIndex, mesh) {
     return globalPosition;
 }
 
-function selectOuterFacesAutomatically(geometry) {
-    const faces = geometry.attributes.position.count / 3;
-    const selectedFaces = new Set();
-    const excludedFaces = new Set();
-
-    const processFace = (faceIndex) => {
-        if (!excludedFaces.has(faceIndex)) {
-            const neighbors = findAllNeighboringFaces(geometry, faceIndex);
-
-            neighbors.forEach(neighborIndex => {
-                excludedFaces.add(neighborIndex); // Exclude neighbors from future iterations
-            });
-
-            const normal = getFaceNormal(geometry, faceIndex);
-            const thresholdMin = 0.2; // Adjust this threshold based on your requirements
-            const thresholdMax = 1;
-
-            // Check if the absolute values are within the range [0.9, 1.1]
-            if (
-                Math.abs(normal.x) >= thresholdMin && Math.abs(normal.x) <= thresholdMax ||
-                Math.abs(normal.y) >= thresholdMin && Math.abs(normal.y) <= thresholdMax ||
-                Math.abs(normal.z) >= thresholdMin && Math.abs(normal.z) <= thresholdMax
-            ) {
-                selectedFaces.add(faceIndex);
-            }
-            neighbors.forEach(processFace); // Recursively process neighbors
-        }
-    };
-
-    // Start processing faces from the beginning
-    for (let i = 0; i < faces; i++) {
-        processFace(i);
-    }
-
-    return Array.from(selectedFaces);
-
-}
-const selectedOuterFaces = selectOuterFacesAutomatically(geometry);
-console.log("Selected Outer Faces:", selectedOuterFaces);
- 
-function selectLayFlatFacesWithNormals(geometry, selectedOuterFaces, angleSet) {
-    const flatfaces = {};
-
-    selectedOuterFaces.forEach(selectedFaceIndex => {
-        const selectedFaceNormal = getFaceNormal(geometry, selectedFaceIndex);
-
-        // Check if the face normal is within the specified angle set
-        const result =isAngleInSet(selectedFaceNormal, angleSet);
-        if (result.isInSet) {
-            const angles = result.angle;
-            const direction = getDirectionLabel(selectedFaceNormal);
-
-            // Initialize the angles entry if it doesn't exist
-            if (!flatfaces[angles]) {
-                flatfaces[angles] = {};
-            }
-
-            // Initialize the direction entry if it doesn't exist
-            if (!flatfaces[angles][direction]) {
-                flatfaces[angles][direction] = {
-                    normals: [],
-                    faceIndices: []
-                };
-            }
-
-            // Add the current normal and face index to the direction entry
-            flatfaces[angles][direction].normals.push(selectedFaceNormal);
-            flatfaces[angles][direction].faceIndices.push(selectedFaceIndex);
-        }
-    });
-
-    return flatfaces;
-}
-
-function getDirectionLabel(normal, threshold = 0.99, thresholdmin=0.2,thresholdMax=0.9) {
-    const epsilon = 1e-6; // A small value to handle rounding errors
-
-    if (normal.x > threshold) {
-        return 'x';
-    } else if (normal.x < -threshold) {
-        return '-x';
-    } else if (normal.y > threshold) {
-        return 'y';
-    } else if (normal.y < -threshold) {
-        return '-y';
-    } else if (normal.z > threshold) {
-        return 'z';
-    } else if (normal.z < -threshold) {
-        return '-z';
-    } else if (Math.abs(normal.x) < epsilon && Math.abs(normal.y) < epsilon) {
-        return 'z'; // xy plane
-    } else if (Math.abs(normal.x) < epsilon && Math.abs(normal.z) < epsilon) {
-        return 'y'; // xz plane
-    } else if (Math.abs(normal.y) < epsilon && Math.abs(normal.z) < epsilon) {
-        return 'x'; // yz plane
-    } else if (Math.abs(normal.x) < epsilon && Math.abs(normal.y) < threshold && Math.abs(normal.z) < threshold) {
-        return 'xy'; // plane between x and y
-    } else if (Math.abs(normal.x) < threshold && Math.abs(normal.y) < epsilon && Math.abs(normal.z) < threshold) {
-        return 'xz'; // plane between x and z
-    } else if (Math.abs(normal.x) < threshold && Math.abs(normal.y) < threshold && Math.abs(normal.z) < epsilon) {
-        return 'yz'; // plane between y and z
-    } else if (
-        Math.abs(normal.x)  >= thresholdmin &&  Math.abs(normal.x)  <= thresholdMax,
-        Math.abs(normal.y)  >= thresholdmin &&  Math.abs(normal.y)  <= thresholdMax,
-        Math.abs(normal.y)  >= thresholdmin &&  Math.abs(normal.y)  <= thresholdMax
-    ) {
-       
-        return 'xyz'; // Zero in all directions
-    } else {
-        return 'unknown';
-    }
-}
-
-
-
-const epsilon = 1e-6; // A small value to handle rounding errors
-function isAngleInSet(normal, angleSet) {
-    // Ensure the normal vector is normalized
-    const length = Math.sqrt(normal.x ** 2 + normal.y ** 2 + normal.z ** 2);
-    const normalizedNormal = {
-        x: normal.x / length,
-        y: normal.y / length,
-        z: normal.z / length,
-    };
-
-    // Calculate the angle in radians using atan2, considering all three components
-    const angle = Math.atan2(normalizedNormal.y, normalizedNormal.x, normalizedNormal.z);
-
-
-    // Convert the angle to degrees and ensure it's within [0, 360] degrees
-    let degrees = (angle * 180) / Math.PI;
-    
-    degrees = (degrees + 360) % 360;
-   // console.log("degree",degrees);
-
-    // Adjust for negative angles
-    if (degrees < 0) {
-        degrees += 360;
-    }
-
-    // Round the angle to the nearest integer
-    degrees = Math.round(degrees);
-
-    const isInSet = angleSet.includes(degrees);
-
-   
-    return { angle: degrees, isInSet };
-}
-
-const angleSet = [0, 45, 90, 70,135, 180,225,270,360];
-
-const selectedLayFlatFacesss = selectLayFlatFacesWithNormals(geometry,selectedOuterFaces,angleSet );
-console.log("Combined Selected Faces:", selectedLayFlatFacesss);
-
-const facesss=  getFacePositions(geometry,1070, meshes);
-
-console.log("afterrotation",facesss);
-
-function findFarthestFaces(selectedFacesWithNormals, geometry, mesh) {
-        const farthestFaces = {};
-    
-        for (const direction in selectedFacesWithNormals) {
-            if (Object.hasOwnProperty.call(selectedFacesWithNormals, direction)) {
-                const directionData = selectedFacesWithNormals[direction];
-    
-                let positiveDistance = -Infinity;
-                let negativeDistance = Infinity;
-                let farthestPositiveFace = null;
-                let farthestNegativeFace = null;
-    
-                for (let i = 0; i < directionData.faceIndices.length; i++) {
-                    const faceIndex = directionData.faceIndices[i];
-                    const facePosition = getFacePositions(geometry, faceIndex, mesh);
-    
-                    let distance;
-    
-                    switch (direction) {
-                        case 'x':
-                        case '-x':
-                            distance = facePosition.x;
-                            break;
-                        case 'y':
-                        case '-y':
-                            distance = facePosition.y;
-                            break;
-                        case 'z':
-                        case '-z':
-                            distance = facePosition.z;
-                            break;
-                        case 'xy':
-                            distance = Math.sqrt(facePosition.x ** 2 + facePosition.y ** 2);
-                            break;
-                        case 'xz':
-                            distance = Math.sqrt(facePosition.x ** 2 + facePosition.z ** 2);
-                            break;
-                        case 'yz':
-                            distance = Math.sqrt(facePosition.y ** 2 + facePosition.z ** 2);
-                            break;
-                        // Add more cases for other directions as needed
-                    }
-    
-                    // Update the farthest face for positive and negative distances
-                    if (distance !== undefined) {
-                        if (distance > positiveDistance) {
-                            positiveDistance = distance;
-                            farthestPositiveFace = faceIndex;
-                        }
-    
-                        if (distance < negativeDistance) {
-                            negativeDistance = distance;
-                            farthestNegativeFace = faceIndex;
-                        }
-                    }
-                }
-    
-                // Determine the overall farthest face based on the maximum absolute distance
-                if (Math.abs(positiveDistance) > Math.abs(negativeDistance)) {
-                    farthestFaces[direction] = farthestPositiveFace;
-                } else {
-                    farthestFaces[direction] = farthestNegativeFace;
-                }
-            }
-        }
-    
-        return farthestFaces;
-    }
-    
-    
-//const farthestFaces = findFarthestFaces(selectedLayFlatFacesss, geometry,meshes);
-
-//console.log("Farthest Faces:", farthestFaces);
-
 let singlemeshes=null;
 
 let negibourefaces = [];
 
-function selectedNeighbours(farthestFaces, geometry) {
-    for (const direction in farthestFaces) {
-        if (Object.hasOwnProperty.call(farthestFaces, direction)) {
-            const farthestFaceIndex = farthestFaces[direction];
-            const neighbors = findAllNeighboringFaces(geometry, farthestFaceIndex);
-            //const farthestFaceNormal = getFaceNormal(geometry, farthestFaceIndex);
-            highlightFilteredNormals(geometry, farthestFaceIndex, neighbors);
-             
-        }
+function selectedNeighbours(geometry,selectedouterfaces) {
+   // const selectedOuterFaces = selectOuterFacesAutomatically(geometry);
+
+    for (const selectedFaceIndex of selectedouterfaces) {
+        const normal=getFaceNormal(geometry,selectedFaceIndex)
+        const neighbors = findAllNeighboringFaces(geometry, selectedFaceIndex);
+      const centered=  findCenterOfNeighboringFaces(geometry, neighbors,selectedFaceIndex);
+     const dimension= findCombinedFaceDimensions(geometry, neighbors);
+     console.log("centerd",centered);
+     const planeMesh = createPlaneMesh(centered, normal, dimension, color);
+    scene.add(planeMesh);
+    console.log("plane",planeMesh);
+        
     }
-    singlemeshes = mergeMeshesIntoSingleMesh(mergedarray);
-            scene.add(singlemeshes);
-            singlemeshes.position.copy(meshes.position);
-singlemeshes.quaternion.copy(meshes.quaternion);
+
 }
+
+   
+
 //console.log("mesd",singlemeshes);
 //selectedNeighbours(farthestFaces, geometry);
 function getFacePosition(geometry, faceIndex) {
@@ -1045,7 +1095,7 @@ function getFaceNormals(geometry, faceIndex) {
     return normal;
 }
 
-const constantPlaneNormal = new THREE.Vector3(0, -1, 0); // Replace with your constant plane normal
+ // Replace with your constant plane normal
 
 function calculateRotationMatrix(selectedFaceNormal, constantPlaneNormal) {
     const axis = new THREE.Vector3().crossVectors(selectedFaceNormal, constantPlaneNormal).normalize();
@@ -1064,12 +1114,115 @@ function calculateRotationMatrix(selectedFaceNormal, constantPlaneNormal) {
     return rotationMatrix;
 }
 
-}, undefined, function (error) {
-    console.error('Error loading STL file:', error);
-});
+}
+function findCenterOfNeighboringFaces(geometry, neighboringFaces,slectedface) {
+    const center = new THREE.Vector3();
+
+    neighboringFaces.forEach(faceIndex => {
+        const faceVertices = getFaceVerticx(geometry, faceIndex);
+        const faceCenter = calculateFaceCenter(faceVertices);
+        center.add(faceCenter);
+    });
+
+    // If there are no neighboring faces, use the center of the selected face
+    if (neighboringFaces.length === 0) {
+        const selectedFaceVertices = getFaceVerticx(geometry ,slectedface);
+        center.copy(calculateFaceCenter(selectedFaceVertices));
+    } else {
+        center.divideScalar(neighboringFaces.length);
+    }
+
+    return center;
+}
+function calculateFaceCenter(faceVertices) {
+    const center = new THREE.Vector3();
+
+    for (let i = 0; i < faceVertices.length; i++) {
+        center.add(faceVertices[i]);
+    }
+
+    center.divideScalar(faceVertices.length);
+
+    return center;
+}
 
 
-}}
+
+// Draw a line from the center to some point (e.g., origin)
+
+
+function getFaceVerticx(geometry, faceIndex) {
+    const positions = geometry.attributes.position.array;
+    const startIndex = faceIndex * 9;
+    return [
+        new THREE.Vector3(positions[startIndex], positions[startIndex + 1], positions[startIndex + 2]),
+        new THREE.Vector3(positions[startIndex + 3], positions[startIndex + 4], positions[startIndex + 5]),
+        new THREE.Vector3(positions[startIndex + 6], positions[startIndex + 7], positions[startIndex + 8]),
+    ];
+}
+
+function findCombinedFaceDimensions(geometry, neighboringFaces, selectedFaceIndex) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+
+    // Include the vertices of the selected face
+    const selectedFaceVertices = getFaceVerticx(geometry, selectedFaceIndex);
+    selectedFaceVertices.forEach(vertex => {
+        minX = Math.min(minX, vertex.x);
+        minY = Math.min(minY, vertex.y);
+        minZ = Math.min(minZ, vertex.z);
+        maxX = Math.max(maxX, vertex.x);
+        maxY = Math.max(maxY, vertex.y);
+        maxZ = Math.max(maxZ, vertex.z);
+    });
+
+    if (neighboringFaces.length === 0) {
+        // If there are no neighboring faces, use the vertices of the selected face
+        const selectedFaceVertices = getFaceVerticx(geometry, selectedFaceIndex);
+
+        selectedFaceVertices.forEach(vertex => {
+            minX = Math.min(minX, vertex.x);
+            minY = Math.min(minY, vertex.y);
+            minZ = Math.min(minZ, vertex.z);
+            maxX = Math.max(maxX, vertex.x);
+            maxY = Math.max(maxY, vertex.y);
+            maxZ = Math.max(maxZ, vertex.z);
+        });
+    } else {
+        neighboringFaces.forEach(faceIndex => {
+            const faceVertices = getFaceVerticx(geometry, faceIndex);
+
+            faceVertices.forEach(vertex => {
+                minX = Math.min(minX, vertex.x);
+                minY = Math.min(minY, vertex.y);
+                minZ = Math.min(minZ, vertex.z);
+                maxX = Math.max(maxX, vertex.x);
+                maxY = Math.max(maxY, vertex.y);
+                maxZ = Math.max(maxZ, vertex.z);
+            });
+        });
+    }
+
+    const dimensions = {
+        width: maxX - minX,
+        height: maxY - minY,
+        depth: maxZ - minZ
+    };
+
+    return dimensions;
+
+  
+}
+
+
+
+
+
+
 
 function animate() {
     requestAnimationFrame(animate);
