@@ -751,11 +751,7 @@ const mergedPositions = [];
         const geometries = meshes.map(mesh => mesh.geometry);
         const mergedGeometry = mergeGeometries(geometries);
     
-        const mergedMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffffff, // White color
-            opacity: 0.5,     // Adjust opacity as needed
-            transparent: true, // Enable transparency
-        });
+        const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, opacity:0.7,transparent:true});
         
         const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial);
     
@@ -795,11 +791,7 @@ const mergedPositions = [];
         const mergedGeometry = mergeGeometries(geometries);
     
         // Create a new mesh with the merged geometry
-        const mergedMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff0000, // White color
-            opacity: 0.2,     // Adjust opacity as needed
-            transparent: true, // Enable transparency
-        });
+        const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, opacity:0.7,transparent:true });
         const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial);
     
       
