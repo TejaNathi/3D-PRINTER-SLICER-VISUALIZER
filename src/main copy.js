@@ -8,7 +8,7 @@
 import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.120.1/examples/jsm/loaders/STLLoader.js';
 //import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { quickHull } from './quickHull.mjs';
-import * as layflat from './src/Layflatnormal.mjs';
+import * as layflat from './Layflatnormal.mjs';
 
 
 
@@ -751,7 +751,11 @@ const mergedPositions = [];
         const geometries = meshes.map(mesh => mesh.geometry);
         const mergedGeometry = mergeGeometries(geometries);
     
-        const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, opacity:0.7,transparent:true});
+        const mergedMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffffff, // White color
+            opacity: 0.5,     // Adjust opacity as needed
+            transparent: true, // Enable transparency
+        });
         
         const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial);
     
@@ -791,7 +795,11 @@ const mergedPositions = [];
         const mergedGeometry = mergeGeometries(geometries);
     
         // Create a new mesh with the merged geometry
-        const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, opacity:0.7,transparent:true });
+        const mergedMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff0000, // White color
+            opacity: 0.2,     // Adjust opacity as needed
+            transparent: true, // Enable transparency
+        });
         const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial);
     
       

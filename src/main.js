@@ -1,14 +1,22 @@
 
 
-//import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import * as THREE from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+
+import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
+
+// Other imports and code...
 
 // Create scene
 //import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.120.1/build/three.module.js';
 
-import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.120.1/examples/jsm/loaders/STLLoader.js';
+//import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.120.1/examples/jsm/loaders/STLLoader.js';
 //import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { quickHull } from './quickHull.mjs';
-import * as layflat from './src/Layflatnormal.mjs';
+import * as layflat from './Layflatnormal.mjs';
 
 
 
@@ -27,13 +35,15 @@ const plane = new THREE.Mesh(planeGeometry, planeMaterial);
 plane.rotation.x = Math.PI / 2; // Rotate the plane to be horizontal
 plane.position.y = 0; // Adjust the position of the plane
 scene.add(plane);
-const faceIndex = 0; // You can change this index based on your requirements
-const faceNormal = new THREE.Vector3();
-planeGeometry.faces[faceIndex].normal.clone(faceNormal);
+console.log("pale",plane.position,plane)
+// const faceIndex = 0; // You can change this index based on your requirements
+// const faceNormal = new THREE.Vector3();
+// planeGeometry.faces[faceIndex].normal.clone(faceNormal);
+
 
 const constantPlaneNormal = new THREE.Vector3(0, -1, 0);
 // //var controls = new THREE.OrbitControls( camera, renderer.domElement );
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
  controls.enableDamping = true;
 
 const circleGeometry = new THREE.CircleGeometry(30, 50); // Radius: 50, Segments: 32
@@ -132,7 +142,7 @@ const color = 0xff0000; // Red color (adjust as needed)
 ;
 
 
-
+let convexMesh=null;
 let boundingBoxMesh=null;
 let boundingBox=null;
 let selectedMesh = null;
@@ -145,6 +155,7 @@ window.addEventListener('resize', (event) => {
 window.addEventListener('mousedown', (event) => {
     event.preventDefault();
 });
+
 let selectedFaceIndex = null;
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -162,7 +173,21 @@ function handleFileSelect(event) {
     meshes.position.set(0, 0, 0);
     scene.add(meshes);
     geometrys=meshes.geometry;
-    
+
+    const verticess = geometry.attributes.position.array;
+      const points = [];
+
+      // Convert flat array to array of Vector3
+      for (let i = 0; i < verticess.length; i += 3) {
+        points.push(new THREE.Vector3(verticess[i], verticess[i + 1], verticess[i + 2]));
+      }
+
+      const convexGeometry = new ConvexGeometry(points);
+      convexMesh = new THREE.Mesh(convexGeometry, new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }));
+      scene.add(convexMesh);
+      convexMesh.visible=false;
+      console.log("convemesh",convexMesh);
+   
 if(geometrys!=null){
     // Assuming 'mesh' is your three.js mesh object
 boundingBox = new THREE.Box3().setFromObject(meshes);
@@ -183,15 +208,15 @@ boundingBox.getCenter(boundingBoxCenter);
 boundingBoxMesh.position.copy(boundingBoxCenter);
 // Add the bounding box to the scene
 scene.add(boundingBoxMesh);
-    const selectedOuterFaces =layflat.selectOuterFacesAutomatically(geometrys);
-    console.log("Selected Outer Faces:", selectedOuterFaces);
-    const selectedLayFlatFacesss = layflat.selectLayFlatFacesWithNormals(geometrys,selectedOuterFaces );
-    console.log("Combined Selected Faces:", selectedLayFlatFacesss);
+//     const selectedOuterFaces =layflat.selectOuterFacesAutomatically(geometrys);
+//     console.log("Selected Outer Faces:", selectedOuterFaces);
+//     const selectedLayFlatFacesss = layflat.selectLayFlatFacesWithNormals(geometrys,selectedOuterFaces );
+//     console.log("Combined Selected Faces:", selectedLayFlatFacesss);
    
-  const removedface =isOuterFace(geometrys,selectedLayFlatFacesss, meshes);
-  console.log("removedface",removedface);
-  selectedNeighbours(geometrys,removedface);
-  finalMergedMesh.visible=false;
+//   const removedface =isOuterFace(geometrys,selectedLayFlatFacesss, meshes);
+//   console.log("removedface",removedface);
+//   selectedNeighbours(geometrys,removedface);
+//   finalMergedMesh.visible=false;
 
  
     }
@@ -479,7 +504,7 @@ function onMouseMove(event) {
           
            // meshes.position.copy(boundingBoxMesh.position);
             meshes.rotation.copy(boundingBoxMesh.rotation);
-            finalMergedMesh.rotation.copy(meshes.rotation);
+            convexMesh.rotation.copy(meshes.rotation);
         }
 
         previousMousePosition = { x: mouse.x, y: mouse.y };
@@ -495,13 +520,13 @@ function onMouseUp() {
     isrotating = false;
   geometrys.verticesNeedUpdate=true
     geometrys.normalsNeedUpdate=true;
-    finalMergedMesh.geometry.verticesNeedUpdate=true;
-    finalMergedMesh.normalsNeedUpdate=true;
+    convexMesh.geometry.verticesNeedUpdate=true;
+    convexMesh.normalsNeedUpdate=true;
     
   
                
                 meshes.updateMatrixWorld();
-                finalMergedMesh.updateMatrixWorld();
+                convexMesh.updateMatrixWorld();
    
     
     boundingBox.setFromObject(meshes);
@@ -576,13 +601,13 @@ function onobjectmove(event) {
             geometrys.verticesNeedUpdate = true;
             geometrys.normalsNeedUpdate = true;
             geometrys.positionNeedYpdate = true;
-            finalMergedMesh.verticesNeedUpdate = true;
-            finalMergedMesh.normalsNeedUpdate = true;
-            finalMergedMesh.positionNeedYpdate = true;
+            convexMesh.verticesNeedUpdate = true;
+            convexMesh.normalsNeedUpdate = true;
+            convexMesh.positionNeedYpdate = true;
 
             meshes.updateMatrixWorld();
-            finalMergedMesh.position.copy(meshes.position);
-            finalMergedMesh.updateMatrixWorld();
+            convexMesh.position.copy(meshes.position);
+            convexMesh.updateMatrixWorld();
 
             boundingBox.setFromObject(meshes);
             boundingBox.getCenter(boundingBoxCenter);
@@ -809,14 +834,15 @@ document.getElementById('layflat').addEventListener('click', function () {
     if (!isMouseDownEventAttached) {
         document.addEventListener('mousedown', onMouseClicksss, false);
         isMouseDownEventAttached = true;
-        finalMergedMesh.visible=true;
+       convexMesh.visible=true;
     
     } else {
         document.removeEventListener('mousedown', onMouseClicksss, false);
         isMouseDownEventAttached = false;
-        finalMergedMesh.visible=false;
+        convexMesh.visible=false;
     }
 });
+
 // const neigbourfacesss = findAllNeighboringFaces(geometry, 58);
 //    console.log("negia",neigbourfacesss);
 
@@ -855,13 +881,6 @@ function containsNaN(array) {
     }
     return false;
 }
-
-
-
-
-
-
-
 function mergeMeshesIntoSingleMesh(meshes) {
     const mergedGeometry = new THREE.BufferGeometry();
     const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
@@ -944,17 +963,17 @@ function onMouseClicksss(event) {
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(finalMergedMesh);
+    const intersects = raycaster.intersectObject(convexMesh);
 
     if (intersects.length > 0) {
         selectedFaceIndex = intersects[0].faceIndex;
         console.log('Selected Face Index:', selectedFaceIndex);
-        const beforroation=  getFacePositions(finalMergedMesh.geometry, selectedFaceIndex, finalMergedMesh);
+        const beforroation=  getFacePositions(convexMesh.geometry, selectedFaceIndex, convexMesh);
        console.log("beforerotationface",beforroation);
         
        meshes.rotation.set(0, 0, 0);
-       finalMergedMesh.rotation.set(0, 0, 0);
-        let selectedFaceNormals =getFaceNormal(finalMergedMesh.geometry, selectedFaceIndex);
+       convexMesh.rotation.set(0, 0, 0);
+        let selectedFaceNormals =getFaceNormal(convexMesh.geometry, selectedFaceIndex);
         console.log('Selected Face Normals:', selectedFaceNormals);
     //const   angles = isAngleInSet( selectedFaceNormals, angleSet)
    // console.log("angless",angles);
@@ -964,7 +983,7 @@ function onMouseClicksss(event) {
         let rotationMatrix = calculateRotationMatrix(selectedFaceNormals, constantPlaneNormal);
        
        
-        let transformationMatrixss = new THREE.Matrix4().copy(finalMergedMesh.matrix);
+        let transformationMatrixss = new THREE.Matrix4().copy(convexMesh.matrix);
        console.log("mesh matrix",transformationMatrixss);
        let transformationMatrixsss = new THREE.Matrix4().copy(meshes.matrix);
 
@@ -979,23 +998,24 @@ function onMouseClicksss(event) {
 
         // Apply the new rotation to the existing matrix
    
-        finalMergedMesh.geometry.applyMatrix4(combinedMatrix);
+        convexMesh.geometry.applyMatrix4(combinedMatrix);
         geometrys.applyMatrix4(combinedMatrixss);
 
     // meshes.updateMatrixWorld();
-    const afeterrotation=  getFacePositions(finalMergedMesh.geometry, selectedFaceIndex,finalMergedMesh);
+    const afeterrotation=  getFacePositions(convexMesh.geometry, selectedFaceIndex,convexMesh);
+    console.log("afterrotation",afeterrotation);
     const afeterrotations=  getFacePositions(geometrys, selectedFaceIndex,meshes);
-    
+    console.log("afterrotation",afeterrotations);
 
     geometrys.verticesNeedUpdate=true
     geometrys.normalsNeedUpdate = true;
     geometrys.positionNeedYpdate=true;
     meshes.updateMatrixWorld();
-    finalMergedMesh.updateMatrixWorld();
-    transformationMatrixss = new THREE.Matrix4().copy(finalMergedMesh.matrix);
+    convexMesh.updateMatrixWorld();
+    transformationMatrixss = new THREE.Matrix4().copy(convexMesh.matrix);
     transformationMatrixsss = new THREE.Matrix4().copy(meshes.matrix);
     console.log("afterrotationmatrix",transformationMatrixss);
-    let transformations = calculateTransformationMatrixs(selectedFaceIndex,plane, finalMergedMesh,afeterrotation);
+    let transformations = calculateTransformationMatrixs(selectedFaceIndex,plane, convexMesh,afeterrotation);
 
     let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes,afeterrotations);
     
@@ -1004,7 +1024,7 @@ function onMouseClicksss(event) {
     
     console.log("combined matr",combinedMatrixs);
     
-    finalMergedMesh.geometry.applyMatrix4(combinedMatrixs);
+    convexMesh.geometry.applyMatrix4(combinedMatrixs);
     geometrys.applyMatrix4(combinedMatrixs);
 
    // meshes.updateMatrixWorld();
@@ -1026,7 +1046,7 @@ function onMouseClicksss(event) {
   
                 createAxesLines(meshes);
                  
-    transformationMatrixss = new THREE.Matrix4().copy(finalMergedMesh.matrix);
+    transformationMatrixss = new THREE.Matrix4().copy(convexMesh.matrix);
     transformationMatrixsss = new THREE.Matrix4().copy(meshes.matrix);
 
    
@@ -1084,26 +1104,30 @@ function createAxesLines(mesh) {
 
 function calculateTransformationMatrixs(faceIndex, planeMesh, mesh,facePosition) {
     // Ensure geometry is updated
-    mesh.geometry.computeBoundingBox();
+
     mesh.updateMatrixWorld();
-    const planeNormal = planeMesh.geometry.faces[0].normal.clone().applyQuaternion(planeMesh.quaternion);
+    const planeNormal = new THREE.Vector3(0, -1, 0);
     const planePosition = planeMesh.position;
+    console.log("facetransformation",planePosition);
 
     // Calculate the vector from the face position to a point on the plane
     const vectorToPlane = new THREE.Vector3().subVectors(facePosition, planePosition);
-
+    
     // Project the vector onto the plane's normal to find the distance to the plane
     const distanceToPlane = (vectorToPlane.dot(planeNormal))*2;
-    console.log("distanceto the plane",distanceToPlane);
+    console.log("distanceto the plane",distanceToPlane );
+    
 
     // Get the vertices of the selected face
     const faceVertices = getFaceVertices(mesh.geometry, faceIndex);
-    console.log("faceposition",facePosition);
+    console.log("faceposition",faceVertices);
     const faceBoundingBox = new THREE.Box3().setFromObject(mesh);
 
     // Calculate the center of the bounding box
     const boundingBoxCenter = new THREE.Vector3();
     faceBoundingBox.getCenter(boundingBoxCenter);
+    console.log("bouanklsdlfnansd",boundingBox);
+    console.log("meshesd",mesh)
 
     // Calculate the center of the face
     const faceCenter = new THREE.Vector3();
