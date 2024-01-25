@@ -1352,6 +1352,7 @@ finalMergedMesh = mergeMeshes(mergedMeshes);
     // Add the final merged mesh to the scene
     scene.add(finalMergedMesh);
     console.log("finalmesh",finalMergedMesh);
+    finalMergedMesh.visible=false;
 }
 
  //   const centered=  findCenterOfNeighboringFaces(geometry, neighbors,selectedFaceIndex);
