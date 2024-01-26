@@ -470,7 +470,7 @@ function onMouseDown(event) {
 
         // Calculate the offset between intersection point and click position
         dragOffset.copy(intersects[0].point).sub(meshes.position);
-        meshes.verticesNeedUpdate=true
+        meshes.verticesNeedUpdate=true;
         meshes.normalsNeedUpdate=true;
 
        
@@ -512,6 +512,9 @@ function onMouseMove(event) {
            // meshes.position.copy(boundingBoxMesh.position);
             meshes.rotation.copy(boundingBoxMesh.rotation);
             finalMergedMesh.rotation.copy(meshes.rotation);
+            
+
+            finalMergedMesh.updateMatrixWorld();
         }
 
         previousMousePosition = { x: mouse.x, y: mouse.y };
@@ -529,11 +532,15 @@ function onMouseUp() {
     geometrys.normalsNeedUpdate=true;
     convexMesh.geometry.verticesNeedUpdate=true;
     convexMesh.normalsNeedUpdate=true;
+    finalMergedMesh.geometry.verticesNeedUpdate=true;
+    finalMergedMesh.geometry.normalsNeedUpdate=true;
+
     
   
                
                 meshes.updateMatrixWorld();
                 convexMesh.updateMatrixWorld();
+                finalMergedMesh.updateMatrixWorld();
    
     
     boundingBox.setFromObject(meshes);
@@ -598,7 +605,7 @@ function onobjectmove(event) {
             // Calculate the new position
             const newX = intersects[0].point.x - dragOffset.x;
             const newZ = intersects[0].point.z - dragOffset.z;
-
+            console.log("Before update:",meshes.geometry);
             // Restrict the movement within the plane boundaries
             const halfPlaneSize = 50; // Assuming the plane size is 200x200
             meshes.position.x = THREE.MathUtils.clamp(newX, -halfPlaneSize, halfPlaneSize);
@@ -607,18 +614,36 @@ function onobjectmove(event) {
             // Update the geometry and bounding box
             geometrys.verticesNeedUpdate = true;
             geometrys.normalsNeedUpdate = true;
-            geometrys.positionNeedYpdate = true;
+            geometrys.positionNeedUpdate = true;
             convexMesh.verticesNeedUpdate = true;
             convexMesh.normalsNeedUpdate = true;
-            convexMesh.positionNeedYpdate = true;
+            convexMesh.positionNeedUpdate = true;
+            
+            
 
-            meshes.updateMatrixWorld();
+         
+            
+           // meshes.updateMatrixWorld();
             finalMergedMesh.position.copy(meshes.position);
-            finalMergedMesh.updateMatrixWorld();
-
             boundingBox.setFromObject(meshes);
             boundingBox.getCenter(boundingBoxCenter);
             boundingBoxMesh.position.copy(boundingBoxCenter);
+            meshes.updateMatrixWorld();
+            meshes.geometry.verticesNeedUpdate=true
+                 meshes.geometry.normalsNeedUpdate = true;
+                 meshes.geometry.positionNeedUpdate=true;
+                 finalMergedMesh.updateMatrixWorld();
+        
+                 finalMergedMesh.updateMatrixWorld();
+        finalMergedMesh.geometry.attributes.position.needsUpdate = true;
+        finalMergedMesh.geometry.normalsNeedUpdate = true;
+        finalMergedMesh.geometry.positionNeedUpdate = true;
+                 console.log("finaled",finalMergedMesh.geometry.attributes.position);
+   // Update the geometry and bounding box
+   finalMergedMesh.geometry.attributes.position.needsUpdate = true;
+   finalMergedMesh.geometry.computeVertexNormals(); // Optional: Update normals
+   
+   console.log("After update:", meshes.geometry.attributes.position);
             createAxesLines(meshes);
         }
     }
@@ -629,23 +654,30 @@ function onobjectmove(event) {
 // Enable OrbitControls on mouseup
 function onup() {
     isDragging = false;
-    meshes.verticesNeedUpdate=true
-    meshes.normalsNeedUpdate=true;
+  //  meshes.verticesNeedUpdate=true
+  //  meshes.normalsNeedUpdate=true;
     boundingBox.setFromObject(meshes);
     boundingBox.getCenter(boundingBoxCenter);
     boundingBoxMesh.position.copy(boundingBoxCenter);
-   
+
     meshes.updateMatrixWorld();
+    meshes.geometry.verticesNeedUpdate=true
+         meshes.geometry.normalsNeedUpdate = true;
+         meshes.geometry.positionNeedUpdate=true;
+         finalMergedMesh.updateMatrixWorld();
 
-    // Enable OrbitControls
-    controls.enabled = true;
-}
-
-
-
+         finalMergedMesh.geometry.verticesNeedUpdate=true;
+         finalMergedMesh.geometry.normalsNeedUpdate=true;
+ 
+   
+  //  console.log("needupdate", finalMergedMesh.geometry.normalsNeedUpdate);
 
 
     
+
+    // Enable OrbitControls
+    controls.enabled = true;
+}   
    
  //  highlightFilteredNormals(geometry, 33, neigbourfacesss  );
 
@@ -778,24 +810,86 @@ const mergedPositions = [];
     
         return mergedGeometry;
     }
+    function mergeGeometriesWithGroups(geometries, materials) {
+        const mergedGeometry = new THREE.BufferGeometry();
+    
+        const positionArrays = [];
+        const normalArrays = [];
+        const groups = [];
+    
+        let vertexOffset = 0;
+    
+        // Extract attributes and groups from each geometry
+        geometries.forEach((geometry, index) => {
+            const positions = geometry.getAttribute('position').array;
+            const normals = geometry.getAttribute('normal').array;
+            const material = materials[index];
+    
+            // Calculate the number of vertices in the geometry
+            const numVertices = positions.length / 3;
+    
+            // Create a group for the current geometry
+            groups.push({
+                start: vertexOffset,
+                count: numVertices,
+                materialIndex: index,
+            });
+    
+            // Increment the vertex offset for the next geometry
+            vertexOffset += numVertices;
+    
+            positionArrays.push(positions);
+            normalArrays.push(normals);
+        });
+    
+        // Merge position attributes
+        const mergedPositionArray = new Float32Array(positionArrays.reduce((acc, arr) => acc.concat(Array.from(arr)), []));
+        mergedGeometry.setAttribute('position', new THREE.BufferAttribute(mergedPositionArray, 3));
+    
+        // Merge normal attributes
+        const mergedNormalArray = new Float32Array(normalArrays.reduce((acc, arr) => acc.concat(Array.from(arr)), []));
+        mergedGeometry.setAttribute('normal', new THREE.BufferAttribute(mergedNormalArray, 3));
+    
+        // Set groups in the merged geometry
+        mergedGeometry.groups = groups;
+    
+        return mergedGeometry;
+    }
+    
 
     
     function mergeMeshes(meshes) {
         const geometries = meshes.map(mesh => mesh.geometry);
-        const mergedGeometry = mergeGeometries(geometries);
+        const materials = meshes.map(mesh => new THREE.MeshBasicMaterial()); // You can customize material creation if needed
+        const mergedGeometry = mergeGeometriesWithGroups(geometries, materials);
     
-        const mergedMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+        // If you want to use a single material for the entire merged mesh, you can use the following:
+        // const mergedMaterial = new THREE.MeshBasicMaterial({
+        //     color: 0xffffff,
+        //     transparent: true,
+        //     opacity: 0.5,
+        //     depthWrite: false,
+        //     polygonOffset: true,
+        //     polygonOffsetFactor: -2,
+        //     polygonOffsetUnits: -2,
+        // });
+        
+        // If you want to use different materials for each group, you can use the following:
+        const mergedMaterials = materials.map(material => new THREE.MeshBasicMaterial({           color: 0xffffff,
             transparent: true,
             opacity: 0.5,
-            depthWrite: false, // Disable depth writing for transparency
-        });
-    
-        const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial);
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
+
+
+    })); // Customize material creation if needed
+        const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterials);
     
         return mergedMesh;
-   
     }
+    
     
     function insetGeometry(geometry, insetAmount) {
         const positions = geometry.attributes.position.array;
@@ -821,11 +915,12 @@ const mergedPositions = [];
     }
     
     
-    function highlightFilteredNormals(geometry, selectedFaceIndex, filteredNormals, mergedMeshes) {
+    function highlightFilteredNormals(geometry, selectedFaceIndex, filteredNormals, mergedMesh) {
         const positions = geometry.attributes.position.array;
         const normals = geometry.attributes.normal.array;
     
         const geometries = [];
+        const materials = [];
     
         // Add the selected face geometry
         const selectedFaceStart = selectedFaceIndex * 9;
@@ -834,6 +929,18 @@ const mergedPositions = [];
         selectedFaceGeometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(selectedFaceStart, selectedFaceEnd), 3));
         selectedFaceGeometry.setAttribute('normal', new THREE.BufferAttribute(normals.slice(selectedFaceStart, selectedFaceEnd), 3));
         geometries.push(selectedFaceGeometry);
+    
+        // Create a new material for the selected face
+        const selectedMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.5,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+        });
+        materials.push(selectedMaterial);
     
         // Add filtered faces geometries
         filteredNormals.forEach((faceIndex) => {
@@ -848,46 +955,127 @@ const mergedPositions = [];
                 // Apply inset effect to each face individually
                 insetGeometry(faceGeometry, 0.2);
                 geometries.push(faceGeometry);
+    
+                // Create a new material for each filtered face
+                const filteredMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.5,
+                    depthWrite: false,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -1,
+                    polygonOffsetUnits: -1,
+                });
+                materials.push(filteredMaterial);
             }
         });
+    
         // Merge all geometries into a single geometry
         const mergedGeometry = mergeGeometries(geometries);
     
         // Create a new mesh with the merged geometry and inset effect
-        const mergedMaterial = new THREE.MeshBasicMaterial({
+        const mergedMeshMaterial = new THREE.MeshStandardMaterial({
             color: 0xffffff,
             transparent: true,
             opacity: 0.5,
-            depthWrite: false, // Disable depth writing for transparency
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
         });
-        const mergedMeshWithInset = new THREE.Mesh(mergedGeometry, mergedMaterial);
+        const mergedMeshWithInset = new THREE.Mesh(mergedGeometry, materials);
     
-        // Add the merged mesh with inset effect to the array
-        mergedMeshes.push(mergedMeshWithInset);
+        // Set material indices for the selected face and filtered faces
+        setMaterialIndices(mergedMeshWithInset, selectedFaceIndex, filteredNormals);
+    
+        mergedMesh.push(mergedMeshWithInset);
     }
     
+    function setMaterialIndices(mesh, selectedFaceIndex, filteredNormals) {
+        const indices = new Float32Array(mesh.geometry.attributes.position.count);
+    
+        // Set material index for the selected face
+        for (let i = selectedFaceIndex * 3 * 3; i < (selectedFaceIndex + 1) * 3 * 3; i += 3) {
+            indices[i] = 0;
+            indices[i + 1] = 0;
+            indices[i + 2] = 0;
+        }
+    
+        // Set material indices for the filtered faces
+        filteredNormals.forEach((faceIndex, index) => {
+            for (let i = faceIndex * 3 * 3; i < (faceIndex + 1) * 3 * 3; i += 3) {
+                indices[i] = index + 1;
+                indices[i + 1] = index + 1;
+                indices[i + 2] = index + 1;
+            }
+        });
+    
+        mesh.geometry.setAttribute('materialIndex', new THREE.BufferAttribute(indices, 1));
+       
+    }
+    
+    
+        
+        // Usage
+        
+        
 let normalSum=null;
 let isMouseDownEventAttached = false;
 
-document.getElementById('layflat').addEventListener('click', function () {
+let translationApplied = false;
+function applyTranslationToObject(object) {
+    // Extract the current position components from the object
+    const currentX = object.position.x;
+    const currentY = object.position.y;
+    const currentZ = object.position.z;
 
+    // Extract the translation components from the object's matrix
+    const translationMatrix = new THREE.Matrix4().copy(object.matrix);
+    const translation = new THREE.Vector3();
+    translationMatrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), translation);
+
+    // Apply the translation to the geometry's position attribute directly
+    const positionAttribute = object.geometry.getAttribute("position");
+    const positions = positionAttribute.array;
+
+    for (let i = 0; i < positions.length; i += 3) {
+        positions[i] += translation.x - currentX;
+        positions[i + 1] += translation.y - currentY;
+        positions[i + 2] += translation.z - currentZ;
+    }
+
+
+    // Reset the object's position to its current position
+    object.updateMatrixWorld(true);
+
+    // Mark the position attribute as needing an update
+    positionAttribute.needsUpdate = true;
+    object.geometry.computeVertexNormals(); 
+
+    object.position.set(0, 0, 0);
+    
+   // Optional: Update normals
+}
+
+
+
+
+document.getElementById('layflat').addEventListener('click', function () {
+    
     if (!isMouseDownEventAttached) {
         document.addEventListener('mousedown', onMouseClicksss, false);
         isMouseDownEventAttached = true;
-        finalMergedMesh.visible=true;
-        
-    
-     
- 
-      
+        finalMergedMesh.visible = true;
     } else {
         document.removeEventListener('mousedown', onMouseClicksss, false);
         isMouseDownEventAttached = false;
-        convexMesh.visible=false;
-       finalMergedMesh.visible=false;
-
+        convexMesh.visible = false;
+        finalMergedMesh.visible = false;
+      
+   
     }
 });
+
 document.addEventListener('mousemove',onhighlight);
 
 // const neigbourfacesss = findAllNeighboringFaces(geometry, 58);
@@ -1004,90 +1192,134 @@ function getFaceNormal(geometry, faceIndex) {
 
 
 
-let highlightedFaceMesh;
+
+
+let highlightedFaceMeshes = []; // Assuming you maintain an array of highlighted face meshes
 
 function resetPreviousSelection() {
-    // Assuming you have a reference to the highlighted face mesh
-    if (highlightedFaceMesh) {
+    // Iterate over each highlighted face mesh
+    highlightedFaceMeshes.forEach(highlightedFaceMesh => {
         // Remove the highlighted face mesh from the scene
         scene.remove(highlightedFaceMesh);
         // Optionally, dispose of the geometry and material to free up resources
         highlightedFaceMesh.geometry.dispose();
         highlightedFaceMesh.material.dispose();
-        // Set the highlightedFaceMesh variable to null or undefined
-        highlightedFaceMesh = null;
-    }
+    });
+
+    // Clear the array of highlighted face meshes
+    highlightedFaceMeshes = [];
 }
+
 
 // Function to highlight selected face
-function highlightSelectedFace(mesh, faceIndex) {
-    // Create a new geometry for the highlighted face
-    const geometry = new THREE.BufferGeometry();
-    const positions = mesh.geometry.attributes.position.array;
-    const normals = mesh.geometry.attributes.normal.array;
+function highlightSelectedFace(mesh,faceIndices) {
+    resetPreviousSelection();
+         highlightedFaceMeshes = [];
+    
+        // Iterate over each face index
+        faceIndices.forEach(faceIndex => {
+            // Create a new geometry for the highlighted face
+            const geometrys = new THREE.BufferGeometry();
+            const positions = mesh.geometry.attributes.position.array;
+            const normals = mesh.geometry.attributes.normal.array;
+    
+            // Extract the vertices of the selected face
+            const startIndex = faceIndex * 9;
+            const endIndex = startIndex + 9;
+            const faceVertices = positions.slice(startIndex, endIndex);
+            const faceNormals = normals.slice(startIndex, endIndex);
+    
+            // Set the position and normal attributes for the highlighted face
+            geometrys.setAttribute('position', new THREE.BufferAttribute(new Float32Array(faceVertices), 3));
+            geometrys.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(faceNormals), 3));
+    
+            // Create a new material for highlighting (e.g., red color)
+            const highlightMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
 
-    // Extract the vertices of the selected face
-    const startIndex = faceIndex * 9;
-    const endIndex = startIndex + 9;
-    const faceVertices = positions.slice(startIndex, endIndex);
-    const faceNormals = normals.slice(startIndex, endIndex);
+                depthWrite: false,
+                polygonOffset: true,
+                polygonOffsetFactor:- 1,
+                polygonOffsetUnits: -1,
+            });
+            
+    
+            // Create a mesh with the highlighted face geometry and material
+            const highlightedFaceMesh = new THREE.Mesh(geometrys, highlightMaterial);
+    
+            // Add the highlighted face mesh to the array
+            highlightedFaceMeshes.push(highlightedFaceMesh);
+    
+            // Add the highlighted face mesh to the scene
+            scene.add(highlightedFaceMesh);
+        });
+    
+        // Return the array of highlighted face meshes
+        return highlightedFaceMeshes;
+    }
+    
 
-    // Set the position and normal attributes for the highlighted face
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(faceVertices), 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(faceNormals), 3));
+    let originalMaterials = null;
 
-    // Create a new material for highlighting (e.g., red color)
-    const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff});
-
-    // Create a mesh with the highlighted face geometry and material
-  highlightedFaceMesh = new THREE.Mesh(geometry, highlightMaterial);
-
-    // Add the highlighted face mesh to the scene
-    scene.add(highlightedFaceMesh);
-}
-
-
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-function onhighlight (event) {
+function onhighlight(event) {
     event.preventDefault();
-        if (isMouseDownEventAttached){
+    if (isMouseDownEventAttached) {
+        const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+        // Update the mouse coordinates
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    // Update the mouse coordinates
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        // Set up the raycaster
+        raycaster.setFromCamera(mouse, camera);
 
-    // Set up the raycaster
-    raycaster.setFromCamera(mouse, camera);
+        // Find intersected faces
+        const intersects = raycaster.intersectObject(finalMergedMesh);
 
-    // Find intersected faces
-    const intersects = raycaster.intersectObject(finalMergedMesh);
-
-    // Check if there is an intersection
-    if (intersects.length > 0) {
-        // Get the face index
-        const faceIndex = intersects[0].faceIndex;
-
-        // Highlight the selected face
-        resetPreviousSelection(); // Reset previous selection first
-        highlightSelectedFace(finalMergedMesh, faceIndex);
-    } else {
-        // No intersection, reset previous selection if needed
-        resetPreviousSelection();
+        // Check if there is an intersection
+        if (intersects.length > 0) {
+            // Get the face index
+            const faceIndex = intersects[0].faceIndex*3;
+            console.log("highlightfaceinject",faceIndex);
+              
+        changeFaceMaterial(finalMergedMesh, faceIndex);
+           
+    }
+    else {
+        // Restore original materials if the mouse is not over the mesh
+        restoreOriginalMaterials(finalMergedMesh);
     }
 }
 }
-// Attach the event listener
+function changeFaceMaterial(mesh, faceIndex) {
+    // Store the original materials if not already stored
+    if (!originalMaterials) {
+        originalMaterials = mesh.material.map(material => material.clone());
+    }
 
+    // Assuming mergedMesh has a BufferGeometry with groups
+    const groups = mesh.geometry.groups;
 
-// Add a function to reset the selection when the mouse leaves the object
-function onMouseLeave() {
-    resetPreviousSelection();
-    selectedFaceIndex = null;
+    // Find the group that corresponds to the faceIndex
+    const group = groups.find(group => faceIndex >= group.start && faceIndex < group.start + group.count);
+
+    // Check if the group is found
+    if (group) {
+        // Update the material for the specific group
+        mesh.material[group.materialIndex].color.set(0xff0000); // Set your desired color
+    }
 }
 
+function restoreOriginalMaterials(mesh) {
+    // Restore the original materials
+    if (originalMaterials) {
+        mesh.material.forEach((material, index) => {
+            material.copy(originalMaterials[index]);
+        });
 
+        originalMaterials = null; // Reset originalMaterials after restoration
+    }
+}
 
 
 
@@ -1106,6 +1338,8 @@ function onMouseClicksss(event) {
         console.log('Selected Face Index:', selectedFaceIndex);
         const beforroation=  getFacePositions(finalMergedMesh.geometry, selectedFaceIndex, finalMergedMesh);
        console.log("beforerotationface",beforroation);
+       const highneibour=findAllNeighboringFaces(finalMergedMesh.geometry,selectedFaceIndex);
+       console.log("neiboashighlight",highneibour);
         
        meshes.rotation.set(0, 0, 0);
        finalMergedMesh.rotation.set(0, 0, 0);
@@ -1118,12 +1352,11 @@ function onMouseClicksss(event) {
         meshes.geometry.positionNeedUpdate=true;
     //const   angles = isAngleInSet( selectedFaceNormals, angleSet)
    // console.log("angless",angles);
+
    // singlemeshes.updateMatrixWorld();
       //  let boxmatrixss=planes.matrix.identity();
        // console.log("boxesmatrixss",boxmatrixss);
         let rotationMatrix = calculateRotationMatrix(selectedFaceNormals, constantPlaneNormal);
-       
-       
         let transformationMatrixss = new THREE.Matrix4().copy(finalMergedMesh.matrix);
        console.log("mesh matrix",transformationMatrixss);
        let transformationMatrixsss = new THREE.Matrix4().copy(meshes.matrix);
@@ -1144,18 +1377,20 @@ function onMouseClicksss(event) {
 
     // meshes.updateMatrixWorld();
     const afeterrotation=  getFacePositions(finalMergedMesh.geometry, selectedFaceIndex,finalMergedMesh);
-    console.log("afterrotation",afeterrotation);
+   // console.log("afterrotation",afeterrotation);
     const afeterrotations=  getFacePositions(meshes.geometry, selectedFaceIndex,meshes);
-    console.log("afterrotation",afeterrotations);
+   // console.log("afterrotation",afeterrotations);
     meshes.updateMatrixWorld();
    meshes.geometry.verticesNeedUpdate=true
         meshes.geometry.normalsNeedUpdate = true;
         meshes.geometry.positionNeedUpdate=true;
+        finalMergedMesh.geometry.verticesNeedUpdate=true;
+        finalMergedMesh.geometry.normalsNeedUpdate=true;
     
     finalMergedMesh.updateMatrixWorld();
     transformationMatrixss = new THREE.Matrix4().copy(finalMergedMesh.matrix);
     transformationMatrixsss = new THREE.Matrix4().copy(meshes.matrix);
-    console.log("afterrotationmatrix",transformationMatrixss);
+    //console.log("afterrotationmatrix",transformationMatrixss);
     let transformations = calculateTransformationMatrixs(selectedFaceIndex,plane, finalMergedMesh,afeterrotation);
 
     let transformation = calculateTransformationMatrixs(selectedFaceIndex,plane, meshes,afeterrotations);
@@ -1163,18 +1398,25 @@ function onMouseClicksss(event) {
     const combinedMatrixs = new THREE.Matrix4().multiplyMatrices( transformationMatrixss, transformations);
     const combinedMatrixsss = new THREE.Matrix4().multiplyMatrices( transformationMatrixsss,transformation);
     
-    console.log("combined matr",combinedMatrixs);
+    //console.log("combined matr",combinedMatrixs);
     
     finalMergedMesh.geometry.applyMatrix4(combinedMatrixs);
     geometrys.applyMatrix4(combinedMatrixs);
 
    // meshes.updateMatrixWorld();
-    geometrys.verticesNeedUpdate=true
-    geometrys.normalsNeedUpdate=true;
-    geometrys.positionNeedYpdate=true;
+    // geometrys.verticesNeedUpdate=true
+    // geometrys.normalsNeedUpdate=true;
+    // geometrys.positionNeedYpdate=true;
+    meshes.updateMatrixWorld();
+    meshes.geometry.verticesNeedUpdate=true
+        meshes.geometry.normalsNeedUpdate = true;
+        meshes.geometry.positionNeedUpdate=true;
+        finalMergedMesh.geometry.verticesNeedUpdate=true;
+        finalMergedMesh.geometry.normalsNeedUpdate=true;
+    
+    finalMergedMesh.updateMatrixWorld();
                
-                meshes.updateMatrixWorld();
-              
+     console.log("finalpostionoffinalmeregedmesh",finalMergedMesh);
                 boundingBox.setFromObject(meshes);
                 boundingBox.getCenter(boundingBoxCenter);
                 boundingBoxMesh.position.copy(boundingBoxCenter);
@@ -1336,24 +1578,35 @@ let singlemeshes=null;
 
 let negibourefaces = [];
 let finalMergedMesh=null;
+let results=null;
+
 
 function selectedNeighbours(geometry, selectedOuterFaces) {
-    const mergedMeshes = [];
-
+    let mergedMeshes = [];
+    const faceMaterials = [];
+let results;
     for (const selectedFaceIndex of selectedOuterFaces) {
         const normal = getFaceNormal(geometry, selectedFaceIndex);
         const neighbors = findAllNeighboringFaces(geometry, selectedFaceIndex);
-        highlightFilteredNormals(geometry, selectedFaceIndex, neighbors, mergedMeshes);
+         highlightFilteredNormals(geometry, selectedFaceIndex, neighbors,mergedMeshes);
+        
     }
 
+   
+    console.log("mergedmeshes",  mergedMeshes);
+
     // Merge all the merged meshes into a single mesh
-finalMergedMesh = mergeMeshes(mergedMeshes);
+    finalMergedMesh = mergeMeshes(mergedMeshes);
+    finalMergedMesh.faceMaterials = faceMaterials;
 
     // Add the final merged mesh to the scene
     scene.add(finalMergedMesh);
-    console.log("finalmesh",finalMergedMesh);
-    finalMergedMesh.visible=false;
+    console.log("finalmesh", finalMergedMesh);
+    
 }
+
+
+
 
  //   const centered=  findCenterOfNeighboringFaces(geometry, neighbors,selectedFaceIndex);
     //  const dimension= findCombinedFaceDimensions(geometry, neighbors);
