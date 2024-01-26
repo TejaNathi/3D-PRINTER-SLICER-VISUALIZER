@@ -230,14 +230,26 @@ scene.add(boundingBoxMesh);
     meshes.userData = { file };
 
     meshes.addEventListener('click', function () {
+
+        event.preventDefault();
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(convexMesh);
+
+        if (intersects.length > 0) {
+
+              selectedMesh = meshes;
+        mesh.material.emissive.setHex(0x00ff00);
         if (selectedMesh) {
             selectedMesh.material.emissive.setHex(0x000000);
             console.log("slectdmesh",selectedMesh);
         }
 
-        selectedMesh = mesh;
+        selectedMesh = meshes;
         mesh.material.emissive.setHex(0x00ff00);
-    });
+    }});
 
         fileInput.value = '';
         console.log("geometrys",geometrys);
@@ -494,7 +506,7 @@ function onMouseMove(event) {
 
         const intersects = raycaster.intersectObject(boundingBoxMesh);
 
-        if (intersects.length > 0) {
+        
             const deltaX = mouse.x - previousMousePosition.x;
             const angle = deltaX * 10;
 
@@ -515,7 +527,7 @@ function onMouseMove(event) {
             
 
             finalMergedMesh.updateMatrixWorld();
-        }
+        
 
         previousMousePosition = { x: mouse.x, y: mouse.y };
     }
