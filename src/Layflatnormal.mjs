@@ -39,14 +39,14 @@ export function selectOuterFacesAutomatically(geometry) {
 }
 
  
-export function selectLayFlatFacesWithNormals(geometry, selectedOuterFaces, angleSet = [0, 45, 90, 70,135, 180,225,270,360,315]) {
+export function selectLayFlatFacesWithNormals(geometry, selectedOuterFaces,angleRanges = [[0, 5], [85, 95],[175,185],[265,275]]) {
     const flatfaces = {};
 
     selectedOuterFaces.forEach(selectedFaceIndex => {
         const selectedFaceNormal = getFaceNormal(geometry, selectedFaceIndex);
 
-        // Check if the face normal is within the specified angle set
-        const result =isAngleInSet(selectedFaceNormal, angleSet);
+        // Check if the face normal falls within any of the specified angle ranges
+        const result =isAngleInSet(selectedFaceNormal, angleRanges);
         if (result.isInSet) {
             const angles = result.angle;
             const direction = getDirectionLabel(selectedFaceNormal);
@@ -71,6 +71,36 @@ export function selectLayFlatFacesWithNormals(geometry, selectedOuterFaces, angl
     });
 
     return flatfaces;
+}
+function isAngleInSet(normal, angleRanges) {
+    // Ensure the normal vector is normalized
+    const length = Math.sqrt(normal.x ** 2 + normal.y ** 2 + normal.z ** 2);
+    const normalizedNormal = {
+        x: normal.x / length,
+        y: normal.y / length,
+        z: normal.z / length,
+    };
+
+    // Calculate the angle in radians using atan2, considering all three components
+    const angle = Math.atan2(normalizedNormal.y, normalizedNormal.x, normalizedNormal.z);
+
+    // Convert the angle to degrees and ensure it's within [0, 360] degrees
+    let degrees = (angle * 180) / Math.PI;
+    degrees = (degrees + 360) % 360;
+
+    // Adjust for negative angles
+    if (degrees < 0) {
+        degrees += 360;
+    }
+
+    // Check if the angle falls within any of the specified ranges
+    for (const [minAngle, maxAngle] of angleRanges) {
+        if (degrees >= minAngle && degrees <= maxAngle) {
+            return { angle: degrees, isInSet: true };
+        }
+    }
+
+    return { angle: degrees, isInSet: false };
 }
 
 function getDirectionLabel(normal, threshold = 0.99, thresholdmin=0.2,thresholdMax=0.9) {
@@ -115,40 +145,40 @@ function getDirectionLabel(normal, threshold = 0.99, thresholdmin=0.2,thresholdM
 
 
 const epsilon = 1e-6; // A small value to handle rounding errors
-function isAngleInSet(normal, angleSet) {
-    // Ensure the normal vector is normalized
-    const length = Math.sqrt(normal.x ** 2 + normal.y ** 2 + normal.z ** 2);
-    const normalizedNormal = {
-        x: normal.x / length,
-        y: normal.y / length,
-        z: normal.z / length,
-    };
+// function isAngleInSet(normal, angleSet) {
+//     // Ensure the normal vector is normalized
+//     const length = Math.sqrt(normal.x ** 2 + normal.y ** 2 + normal.z ** 2);
+//     const normalizedNormal = {
+//         x: normal.x / length,
+//         y: normal.y / length,
+//         z: normal.z / length,
+//     };
 
-    // Calculate the angle in radians using atan2, considering all three components
-    const angle = Math.atan2(normalizedNormal.y, normalizedNormal.x, normalizedNormal.z);
+//     // Calculate the angle in radians using atan2, considering all three components
+//     const angle = Math.atan2(normalizedNormal.y, normalizedNormal.x, normalizedNormal.z);
 
 
-    // Convert the angle to degrees and ensure it's within [0, 360] degrees
-    let degrees = (angle * 180) / Math.PI;
+//     // Convert the angle to degrees and ensure it's within [0, 360] degrees
+//     let degrees = (angle * 180) / Math.PI;
     
-    degrees = (degrees + 360) % 360;
-   // console.log("degree",degrees);
+//     degrees = (degrees + 360) % 360;
+//    // console.log("degree",degrees);
 
-    // Adjust for negative angles
-    if (degrees < 0) {
-        degrees += 360;
-    }
+//     // Adjust for negative angles
+//     if (degrees < 0) {
+//         degrees += 360;
+//     }
 
-    // Round the angle to the nearest integer
-    degrees = Math.round(degrees);
+//     // Round the angle to the nearest integer
+//     degrees = Math.round(degrees);
 
-    const isInSet = angleSet.includes(degrees);
+//     const isInSet = angleSet.includes(degrees);
 
    
-    return { angle: degrees, isInSet };
-}
+//     return { angle: degrees, isInSet };
+// }
 
-const angleSet = [0, 45, 90, 70,135, 180,225,270,360,315];
+// const angleSet = [0, 45, 90, 70,135, 180,225,270,360,315];
 
 
 
