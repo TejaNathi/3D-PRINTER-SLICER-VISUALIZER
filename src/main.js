@@ -199,8 +199,6 @@ if(geometrys!=null){
 boundingBox = new THREE.Box3().setFromObject(meshes);
 console.log("gemeotry",geometrys);
 
-
-// Create a wireframe material for the bounding box
 const wireframeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 const wireframeGeometry = new THREE.BoxGeometry(
   boundingBox.max.x - boundingBox.min.x,
@@ -215,16 +213,16 @@ boundingBox.getCenter(boundingBoxCenter);
 boundingBoxMesh.position.copy(boundingBoxCenter);
 // Add the bounding box to the scene
 scene.add(boundingBoxMesh);
+boundingBoxMesh.visible=false;
     const selectedOuterFaces =layflat.selectOuterFacesAutomatically(convexMesh.geometry);
     console.log("Selected Outer Faces:", selectedOuterFaces);
-//     const selectedLayFlatFacesss = layflat.selectLayFlatFacesWithNormals(convexMesh.geometry,selectedOuterFaces );
-//     console.log("Combined Selected Faces:", selectedLayFlatFacesss);
-   
-//   const removedface =isOuterFace(convexMesh.geometry,selectedLayFlatFacesss,convexMesh);
-//   console.log("removedface",removedface);
   selectedNeighbours(convexMesh.geometry,selectedOuterFaces);
 
 
+setTimeout(() => {
+    const intersectedresults = raycastFaces(finalMergedMesh.geometry, selectedOuterFaces, meshes, 0.1);
+    largestNeighbors = findLargestNeighborIndices(finalMergedMesh.geometry, intersectedresults);
+},1000);
  
     }
     meshes.userData = { file };
@@ -267,13 +265,13 @@ scene.add(boundingBoxMesh);
 //     }
 // });
 document.getElementById('Autoplace').addEventListener('click', function () {
- autoplace(finalMergedMesh,meshes,largestNeighbors[0]);
+ autoplace(finalMergedMesh,meshes,largestNeighbors[1]);
 });
 
     // Handle mouse click to select face
    // window.removeEventListener('click', onMouseClick);
     // Add the click event listener
-   window.addEventListener('click', onMouseClick, false);
+  // window.addEventListener('click', onMouseClick, false);
     
 
     function onMouseClick(event) {
@@ -957,6 +955,9 @@ const mergedPositions = [];
         });
         materials.push(selectedMaterial);
     
+        // Apply inset effect to the selected face
+        insetGeometry(selectedFaceGeometry, 0.05);
+    
         // Add filtered faces geometries
         filteredNormals.forEach((faceIndex) => {
             const startIndex = faceIndex * 9;
@@ -968,14 +969,14 @@ const mergedPositions = [];
     
             if (!containsNaN(faceGeometry.attributes.position.array) && !containsNaN(faceGeometry.attributes.normal.array)) {
                 // Apply inset effect to each face individually
-                insetGeometry(faceGeometry, 0.2);
+                insetGeometry(faceGeometry, 0.05);
                 geometries.push(faceGeometry);
     
                 // Create a new material for each filtered face
                 const filteredMaterial = new THREE.MeshStandardMaterial({
                     color: 0xffffff,
                     transparent: true,
-                    opacity: 0.5,
+                    opacity: 0.05,
                     depthWrite: false,
                     polygonOffset: true,
                     polygonOffsetFactor: -1,
@@ -1005,6 +1006,7 @@ const mergedPositions = [];
     
         mergedMesh.push(mergedMeshWithInset);
     }
+    
     
     function setMaterialIndices(mesh, selectedFaceIndex, filteredNormals) {
         const indices = new Float32Array(mesh.geometry.attributes.position.count);
@@ -1724,17 +1726,15 @@ function selectedNeighbours(geometry, selectedOuterFaces) {
 
     // Add the final merged mesh to the scene
     scene.add(finalMergedMesh);
-    const facedindex=528;
-    const itsneigbours=findAllNeighboringFaces(finalMergedMesh.geometry,facedindex);
-    console.log("its neogbours",itsneigbours);
-    const dimesioned=findCombinedFaceDimensions(finalMergedMesh.geometry,itsneigbours, facedindex);
-    console.log("dimesions",dimesioned); 
-  const intersectedresults=  raycastFaces(finalMergedMesh.geometry, selectedOuterFaces, meshes, 0.1);
+
+//   const intersectedresults=  raycastFaces(finalMergedMesh.geometry, selectedOuterFaces, meshes, 0.1);
+//   console.log("intsdsjjfjadsf",intersectedresults.selectedFaceIndex);
  
 
-  largestNeighbors = findLargestNeighborIndices(finalMergedMesh.geometry,   intersectedresults);
+//   largestNeighbors = findLargestNeighborIndices(finalMergedMesh.geometry,   intersectedresults);
     
 }
+
 
 
 function findLargestNeighborIndices(geometry, intersectionResults) {
@@ -1749,7 +1749,6 @@ function findLargestNeighborIndices(geometry, intersectionResults) {
         const combinedSize = calculateSizeFromDimensions(dimensions);
         console.log("faceindex", selectedFaceIndex, combinedSize);
 
-        // Update largest neighbors if necessary
         if (combinedSize > largestSizes[0]) {
             largestSizes[1] = largestSizes[0];
             largestSizes[0] = combinedSize;
@@ -1779,67 +1778,59 @@ function calculateSizeFromDimensions(dimensions){
 function raycastFaces(geometry, selectedOuterFaces, originalMeshgeometry, threshold) {
     const raycasters = new THREE.Raycaster();
     const intersectionResults = [];
+
     for (const selectedFaceIndex of selectedOuterFaces) {
+        // Create a copy of the face's normal to invert it
+        let invertedNormal = getFaceNormal(geometry, selectedFaceIndex);
+        invertedNormal.negate();
+let neigboured=null;
+        // Create a vector representing the face's position
+        const facePosition = getFacePosition(geometry, selectedFaceIndex);
 
-    // // Create a copy of the face's normal to invert it
-    let invertedNormal = getFaceNormal(geometry, selectedFaceIndex);
-    invertedNormal.negate();
-
-
-    // Create a vector representing the face's position
-    const facePosition = getFacePosition(geometry, selectedFaceIndex);
-
-
-    raycasters.set(facePosition, invertedNormal);
-    
-
-    // Get the intersection point and face index on the original mesh
-    const intersection = raycasters.intersectObject(originalMeshgeometry, true);
-
-    if (intersection.length > 0) {
-        const intersectedFaceIndex = getIntersectedFaceIndex(intersection[0]);
-       // console.log("intersected faceindex");
-        const distance = getDistance(intersection[0].point, facePosition);
-       // console.log("distance",distance);
-
-        // Check if the intersected face is within the threshold distance
-        if (distance <= threshold) {
-          //  intersectionResults.push({ selectedFaceIndex, neighborFaceIndex: intersectedFaceIndex });
-        }
-    }
-    const neighbors = findAllNeighboringFaces(geometry, selectedFaceIndex);
-   // console.log("negiaifa",neighbors);
-   const neighborIndices = [];
-    // Loop through the neighbors and repeat the process
-    for (const neighborIndex of neighbors) {
-        // Similar raycasting logic for neighbors
-        // Create a vector representing the neighbor face's position
-        const neighborFacePosition = getFacePosition(geometry, neighborIndex);
-        let invertedNormals = getFaceNormal(geometry, neighborIndex);
-        invertedNormals.negate();
-
-        // Raycast from the neighbor face towards the original mesh
-        raycaster.set(neighborFacePosition, invertedNormals);
+        raycasters.set(facePosition, invertedNormal);
 
         // Get the intersection point and face index on the original mesh
-        const neighborIntersection = raycaster.intersectObject(originalMeshgeometry, true);
+        const intersection = raycasters.intersectObject(originalMeshgeometry, true);
+       
+        if (intersection.length > 0) {
+            const distance = getDistance(intersection[0].point, facePosition);
 
-        if (neighborIntersection.length > 0) {
-            const neighborIntersectedFaceIndex = getIntersectedFaceIndex(neighborIntersection[0]);
-            const neighborDistance = getDistance(neighborIntersection[0].point, neighborFacePosition);
-
-            // Check if the intersected face is within the threshold distance
-            if (neighborDistance <= threshold) {
-              
+            if (distance <= threshold) {
+                const neighbors = findAllNeighboringFaces(geometry, selectedFaceIndex);
+                intersectionResults.push({ selectedFaceIndex, neighborIndices: neighbors });
+                continue;
             }
-            neighborIndices.push(neighborIndex);
+          
         }
-    }
-    intersectionResults.push({ selectedFaceIndex, neighborIndices });
-    }
-   
+        else{
+            neigboured = findAllNeighboringFaces(geometry, selectedFaceIndex);
+
+        const neighborIndices = [];
+
+        for (const neighborIndex of neigboured) {
+            const neighborFacePosition = getFacePosition(geometry, neighborIndex);
+            const invertedNormals = getFaceNormal(geometry, neighborIndex);
+            invertedNormal.negate();
+            raycasters.set(neighborFacePosition, invertedNormals);
+
+            const neighborIntersection = raycasters.intersectObject(originalMeshgeometry, true);
+
+            if (neighborIntersection.length > 0) {
+                const neighborDistance = getDistance(neighborIntersection[0].point, neighborFacePosition);
+                if (neighborDistance <= threshold) {
+                    neighborIndices.push(neighborIndex);
+                }
+            }
+        }
+
+        if (neighborIndices.length > 0) {
+            intersectionResults.push({ selectedFaceIndex, neighborIndices });
+        }
+    }}
+
     return intersectionResults;
 }
+
 
 // Additional helper functions
 function getIntersectedFaceIndex(intersection) {
