@@ -221,7 +221,7 @@ boundingBoxMesh.visible=false;
 
 setTimeout(() => {
     const intersectedresults = raycastFaces(finalMergedMesh.geometry, selectedOuterFaces, meshes, 0.1);
-    largestNeighbors = findLargestNeighborIndices(finalMergedMesh.geometry, intersectedresults);
+    largestNeighbors =findLargestNeighborIndex(finalMergedMesh.geometry, intersectedresults);
 },1000);
  
     }
@@ -265,7 +265,7 @@ setTimeout(() => {
 //     }
 // });
 document.getElementById('Autoplace').addEventListener('click', function () {
- autoplace(finalMergedMesh,meshes,largestNeighbors[1]);
+ autoplace(finalMergedMesh,meshes,largestNeighbors);
 });
 
     // Handle mouse click to select face
@@ -1737,9 +1737,9 @@ function selectedNeighbours(geometry, selectedOuterFaces) {
 
 
 
-function findLargestNeighborIndices(geometry, intersectionResults) {
-    let largestNeighbors = [-1, -1]; // Initialize with invalid indices
-    let largestSizes = [0, 0]; // Initialize with sizes of 0
+function findLargestNeighborIndex(geometry, intersectionResults) {
+    let largestNeighbor = -1; // Initialize with an invalid index
+    let largestSize = 0; // Initialize with a size of 0
 
     for (const result of intersectionResults) {
         const selectedFaceIndex = result.selectedFaceIndex;
@@ -1749,19 +1749,16 @@ function findLargestNeighborIndices(geometry, intersectionResults) {
         const combinedSize = calculateSizeFromDimensions(dimensions);
         console.log("faceindex", selectedFaceIndex, combinedSize);
 
-        if (combinedSize > largestSizes[0]) {
-            largestSizes[1] = largestSizes[0];
-            largestSizes[0] = combinedSize;
-            largestNeighbors[1] = largestNeighbors[0];
-            largestNeighbors[0] = selectedFaceIndex;
-        } else if (combinedSize > largestSizes[1]) {
-            largestSizes[1] = combinedSize;
-            largestNeighbors[1] = selectedFaceIndex;
+        if (combinedSize > largestSize) {
+            largestSize = combinedSize;
+            largestNeighbor = selectedFaceIndex;
         }
     }
-    console.log("largestnode", largestNeighbors);
-    return largestNeighbors;
+    
+    console.log("largestnode", largestNeighbor);
+    return largestNeighbor;
 }
+
 
 
 
