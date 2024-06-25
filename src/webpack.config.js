@@ -1,5 +1,6 @@
 const path = require('path');
 
+
 module.exports = {
     mode: 'development',
     entry: './main.js', // Assuming main.js is directly inside the src folder

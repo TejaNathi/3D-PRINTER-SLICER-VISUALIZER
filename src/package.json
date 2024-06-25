@@ -14,13 +14,9 @@
   },
   "scripts": {
     "build": "webpack",
-    "start": "webpack serve --open"
+    "start": "webpack serve --open" 
   },
-  "babel": {
-    "presets": [
-      "@babel/preset-env"
-    ]
-  },
+ 
   "name": "src",
   "version": "1.0.0",
   "main": "main.js",
