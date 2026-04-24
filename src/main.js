@@ -17,6 +17,7 @@ import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 //import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { quickHull } from './quickHull.mjs';
 import * as layflat from './Layflatnormal.mjs';
+import { buildProjectedFootprint, createShapeFromPoints } from './footprintProjection.mjs';
 
 
 
@@ -151,6 +152,7 @@ let boundingBoxMesh=null;
 let boundingboxarray=[];
 let boundingBox=null;
 let selectedMesh = null;
+let footprintMesh = null;
 const boundingBoxCenter = new THREE.Vector3();
 window.addEventListener('resize', (event) => {
     camera.aspect = innerWidth / innerHeight;
@@ -191,6 +193,24 @@ function handleFileSelect(event) {
       convexMesh = new THREE.Mesh(convexGeometry, new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }));
       scene.add(convexMesh);
       convexMesh.visible=false;
+
+      // Build a 2D footprint (XZ) from the convex hull for irregular packing input.
+      const footprint = buildProjectedFootprint(convexGeometry, { axis: 'y' });
+      const footprintShape = createShapeFromPoints(footprint.points);
+      if (footprintShape) {
+        if (footprintMesh) {
+          scene.remove(footprintMesh);
+        }
+        // Visual preview of the extracted footprint on top of the build plate.
+        const footprintGeometry = new THREE.ShapeGeometry(footprintShape);
+        const footprintMaterial = new THREE.MeshBasicMaterial({ color: 0x2196f3, wireframe: true });
+        footprintMesh = new THREE.Mesh(footprintGeometry, footprintMaterial);
+        footprintMesh.rotation.x = Math.PI / 2;
+        footprintMesh.position.y = 0.05;
+        scene.add(footprintMesh);
+        // Persist 2D polygon points for the auto-placement / irregular-packing stage.
+        meshes.userData.footprint = footprint.points.map((point) => ({ x: point.x, y: point.y }));
+      }
  
     //   const projectedVertices = getProjectedVertices(geometry);
     //   const convexHull = computeConvexHull(projectedVertices);
@@ -229,7 +249,7 @@ setTimeout(() => {
 },1000);
  
     }
-    meshes.userData = { file };
+    meshes.userData = { ...meshes.userData, file };
 
     meshes.addEventListener('click', function () {
 
@@ -1748,8 +1768,9 @@ meshes.geometry.verticesNeedUpdate=true
  
  //console.log("combined matr",combinedMatrixs);
  
+ // Apply the plane-alignment translation to both meshes that are rendered.
  finalMergedMesh.geometry.applyMatrix4(combinedMatrixs);
- geometrys.applyMatrix4(combinedMatrixs);
+ meshes.geometry.applyMatrix4(combinedMatrixsss);
 
 // meshes.updateMatrixWorld();
  // geometrys.verticesNeedUpdate=true
@@ -1761,6 +1782,12 @@ meshes.geometry.verticesNeedUpdate=true
      meshes.geometry.positionNeedUpdate=true;
      finalMergedMesh.geometry.verticesNeedUpdate=true;
      finalMergedMesh.geometry.normalsNeedUpdate=true;
+     if (meshes.geometry.attributes?.position) {
+        meshes.geometry.attributes.position.needsUpdate = true;
+     }
+     if (finalMergedMesh.geometry.attributes?.position) {
+        finalMergedMesh.geometry.attributes.position.needsUpdate = true;
+     }
  
  finalMergedMesh.updateMatrixWorld();
             
