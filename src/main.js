@@ -1768,8 +1768,9 @@ meshes.geometry.verticesNeedUpdate=true
  
  //console.log("combined matr",combinedMatrixs);
  
+ // Apply the plane-alignment translation to both meshes that are rendered.
  finalMergedMesh.geometry.applyMatrix4(combinedMatrixs);
- geometrys.applyMatrix4(combinedMatrixs);
+ meshes.geometry.applyMatrix4(combinedMatrixsss);
 
 // meshes.updateMatrixWorld();
  // geometrys.verticesNeedUpdate=true
@@ -1781,6 +1782,12 @@ meshes.geometry.verticesNeedUpdate=true
      meshes.geometry.positionNeedUpdate=true;
      finalMergedMesh.geometry.verticesNeedUpdate=true;
      finalMergedMesh.geometry.normalsNeedUpdate=true;
+     if (meshes.geometry.attributes?.position) {
+        meshes.geometry.attributes.position.needsUpdate = true;
+     }
+     if (finalMergedMesh.geometry.attributes?.position) {
+        finalMergedMesh.geometry.attributes.position.needsUpdate = true;
+     }
  
  finalMergedMesh.updateMatrixWorld();
             
